@@ -87,7 +87,7 @@ const DEMO_USERS: AppUser[] = [
 /* ─── Types ─────────────────────────────────────────────── */
 type Role = "docente" | "tecnico" | "admin";
 type Priority = "Urgente" | "Media" | "Baja";
-type Status = "Pendiente" | "En proceso" | "Resuelto";
+type Status = "Pendiente" | "En proceso" | "Resuelto" | "Cancelado";
 type Category = "Minisplit/Clima" | "Chapas/Puertas" | "Eléctrico" | "Mobiliario" | "Plomería" | "Otro";
 type Tab = "home" | "usuarios" | "reportes" | "perfil";
 
@@ -125,7 +125,7 @@ interface MaterialRequest {
 interface AppUser {
   id: string;
   email: string;
-  role: "tecnico" | "docente";
+  role: "tecnico" | "docente" | "admin";
   temporaryPassword?: string;
 }
 
@@ -137,6 +137,19 @@ function timeAgo(ts: Timestamp | null): string {
   if (diff < 3600) return `Hace ${Math.floor(diff / 60)}min`;
   if (diff < 86400) return `Hace ${Math.floor(diff / 3600)}h`;
   return `Hace ${Math.floor(diff / 86400)} días`;
+}
+
+function formatDateTime(ts: Timestamp | null): string {
+  if (!ts) return "Fecha no disponible";
+  const date = ts.toDate();
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 }
 
 const PRIORITY_LABELS: Record<Priority, string> = {
@@ -158,6 +171,7 @@ const STATUS_BADGE: Record<Status, string> = {
   Pendiente: "bg-yellow-100 text-yellow-700",
   "En proceso": "bg-blue-100 text-blue-700",
   Resuelto: "bg-green-100 text-green-700",
+  Cancelado: "bg-red-100 text-red-700",
 };
 const CAT_ICON: Record<Category, string> = {
   "Minisplit/Clima": "❄️",
@@ -235,6 +249,7 @@ const UsersIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="cu
 function LoginScreen({ onLogin, demoMode }: { onLogin: (u: User | null, role: Role) => void; demoMode?: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -244,6 +259,10 @@ function LoginScreen({ onLogin, demoMode }: { onLogin: (u: User | null, role: Ro
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (isRegister && password !== confirmPassword) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
     setLoading(true);
     // Demo mode: skip Firebase, use email to decide role
     if (demoMode) {
@@ -312,6 +331,19 @@ function LoginScreen({ onLogin, demoMode }: { onLogin: (u: User | null, role: Ro
             </button>
           )}
         </div>
+        {isRegister && (
+          <div>
+            <label className="text-white text-xs font-bold mb-1 block">Confirmar contraseña:</label>
+            <input
+              type="password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-white/10 border border-white/20 text-white placeholder-white/40 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#17c3ce] transition"
+            />
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-500/20 border border-red-400/30 rounded-xl px-3 py-2 text-red-300 text-xs">
@@ -331,7 +363,7 @@ function LoginScreen({ onLogin, demoMode }: { onLogin: (u: User | null, role: Ro
       <div className="flex items-center justify-center mt-7 text-sm">
         <button
           type="button"
-          onClick={() => { setIsRegister(!isRegister); setError(""); }}
+          onClick={() => { setIsRegister(!isRegister); setConfirmPassword(""); setError(""); }}
           className="text-white/70 hover:text-[#f7e7a3] transition-colors duration-200"
         >
           {isRegister ? "Ya tengo cuenta" : "Regístrate"}
@@ -345,14 +377,16 @@ function LoginScreen({ onLogin, demoMode }: { onLogin: (u: User | null, role: Ro
    SCREEN 2 — Home Docente
 ════════════════════════════════════════════════════════════ */
 function HomeScreen({
-  user, role, reports, onNewReport, onTab, tab,
+  user, role, reports, onNewReport, onTab, tab, onCancelReport,
 }: {
   user: User; role: Role; reports: Report[];
   onNewReport: (cat?: Category) => void;
+  onCancelReport?: (id: string) => void;
   onTab: (t: Tab) => void; tab: Tab;
 }) {
-  const myReports = reports.filter((r) => r.reportedByUid === user.uid).slice(0, 3);
-  const displayName = user.displayName || user.email?.split("@")[0] || "Usuario";
+  const myReports = reports.filter((r) => r.reportedByUid === user.uid && r.status !== "Cancelado").slice(0, 3);
+  const [openReport, setOpenReport] = useState<string | null>(null);
+  const [confirmReport, setConfirmReport] = useState<string | null>(null);
 
   return (
     <>
@@ -397,10 +431,35 @@ function HomeScreen({
                 {myReports.map((r) => (
                   <div key={r.id} className="bg-[#f8fafc] rounded-xl px-4 py-3 flex items-center gap-3 shadow-sm border border-gray-100">
                     <span className={`w-2.5 h-2.5 rounded-full flex-none ${PRIORITY_DOT[r.priority]}`} />
-                    <span className="flex-1 text-xs text-[#0e1f4d] font-semibold leading-snug">{r.description}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-none ${STATUS_BADGE[r.status]}`}>
-                      {r.status}
-                    </span>
+                    <span className="flex-1 text-xs text-[#0e1f4d] font-semibold leading-snug">{r.elemento} · {r.salon}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-none ${STATUS_BADGE[r.status]}`}>
+                        {r.status}
+                      </span>
+                      {r.status !== "Resuelto" && r.status !== "Cancelado" && onCancelReport && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            aria-label={`Opciones de ${r.description}`}
+                            onClick={() => setOpenReport(openReport === r.id ? null : r.id)}
+                            className="w-7 h-7 rounded-lg text-slate-400 text-sm font-extrabold leading-none hover:bg-slate-200 transition"
+                          >
+                            ...
+                          </button>
+                          {openReport === r.id && (
+                            <div className="absolute right-0 top-8 z-10 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                              <button
+                                type="button"
+                                onClick={() => { setOpenReport(null); setConfirmReport(r.id); }}
+                                className="whitespace-nowrap rounded-lg px-3 py-2 text-xs font-extrabold text-red-600 hover:bg-red-50"
+                              >
+                                Cancelar reporte
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -409,6 +468,18 @@ function HomeScreen({
         </div>
       </div>
       <TabBar active={tab} onChange={onTab} />
+      {confirmReport && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0e1f4d]/30 p-5">
+          <div className="w-full rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-[#0e1f4d] text-base font-extrabold">¿Cancelar este reporte?</h3>
+            <p className="text-slate-500 text-xs mt-2">Esta acción retirará el reporte de tu lista.</p>
+            <div className="grid grid-cols-2 gap-2 mt-5">
+              <button type="button" onClick={() => setConfirmReport(null)} className="rounded-xl border border-slate-200 py-2.5 text-xs font-extrabold text-slate-600 hover:bg-slate-50">Volver</button>
+              <button type="button" onClick={() => { onCancelReport?.(confirmReport); setConfirmReport(null); }} className="rounded-xl bg-red-600 py-2.5 text-xs font-extrabold text-white hover:bg-red-700">Cancelar reporte</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -591,12 +662,12 @@ function NuevaFallaScreen({
    SCREEN 4 — Mantenimiento (Técnico)
 ════════════════════════════════════════════════════════════ */
 function MantenimientoScreen({
-  reports, onDetail, onTab, tab, readOnly = false, title = "Mantenimiento",
+  reports, onDetail, onTab, tab, readOnly = false, title = "Mantenimiento", admin = false,
 }: {
   reports: Report[]; onDetail: (id: string) => void; onTab: (t: Tab) => void; tab: Tab;
-  readOnly?: boolean; title?: string;
+  readOnly?: boolean; title?: string; admin?: boolean;
 }) {
-  const pending = reports.filter((r) => r.status !== "Resuelto");
+  const pending = reports.filter((r) => r.status !== "Resuelto" && r.status !== "Cancelado");
 
   return (
     <>
@@ -617,8 +688,8 @@ function MantenimientoScreen({
                 <span className={`w-2.5 h-2.5 rounded-full flex-none ${PRIORITY_DOT[r.priority]}`} />
                 <span className={`text-xs font-extrabold ${PRIORITY_BADGE[r.priority]}`}>{PRIORITY_LABELS[r.priority]}</span>
               </div>
-              <p className="text-[#0e1f4d] text-sm font-extrabold leading-snug mb-0.5">{CAT_ICON[r.category]} {r.category}</p>
-              <p className="text-gray-400 text-xs">{timeAgo(r.createdAt)} | {r.reportedBy}</p>
+              <p className="text-[#0e1f4d] text-sm font-extrabold leading-snug mb-0.5">{CAT_ICON[r.category]} {r.elemento} · {r.salon}</p>
+              <p className="text-gray-400 text-xs">{formatDateTime(r.createdAt)} | {r.reportedBy}</p>
               {!readOnly && <div className="flex gap-2 mt-3 flex-wrap">
                 <button onClick={() => onDetail(r.id)} className="text-xs font-bold text-[#0e1f4d] border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition">
                   Ver detalles
@@ -634,7 +705,7 @@ function MantenimientoScreen({
           )}
         </div>
       </div>
-      <TabBar active={tab} onChange={onTab} />
+      <TabBar active={tab} onChange={onTab} admin={admin} />
     </>
   );
 }
@@ -896,7 +967,7 @@ function DetalleScreen({
 
       <div className="flex flex-col items-center gap-2 px-5 pt-3 pb-6 bg-white border-t border-gray-100 flex-none">
         {actionMessage && <p className="text-center text-xs font-bold text-emerald-600">{actionMessage}</p>}
-        <button onClick={() => void handleResolve()} disabled={saving} className="w-full max-w-xs bg-[#17c3ce] text-white font-extrabold py-3 px-5 rounded-full text-sm hover:bg-[#12a8b3] transition disabled:opacity-60">
+        <button onClick={() => void handleResolve()} disabled={saving || report.status === "Cancelado"} className="w-full max-w-xs bg-[#17c3ce] text-white font-extrabold py-3 px-5 rounded-full text-sm hover:bg-[#12a8b3] transition disabled:opacity-60">
           {saving ? "Guardando..." : "Marcar como resuelto"}
         </button>
       </div>
@@ -908,7 +979,6 @@ function DetalleScreen({
    SCREEN 6 — Historial
 ════════════════════════════════════════════════════════════ */
 function HistorialScreen({ reports, materialRequests, role, onTab, tab }: { reports: Report[]; materialRequests: MaterialRequest[]; role: Role; onTab: (t: Tab) => void; tab: Tab }) {
-  const [reportOpen, setReportOpen] = useState(false);
   const currentDate = new Date();
   const monthName = currentDate.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
   const isCurrentMonth = (timestamp: Timestamp | null) => {
@@ -927,9 +997,9 @@ function HistorialScreen({ reports, materialRequests, role, onTab, tab }: { repo
       <div className="flex-1 overflow-y-auto bg-[#f4f6fb] px-4 pt-5 pb-4 scrollbar-hide">
         <div className="flex items-center justify-between gap-3 mb-3">
           <h2 className="text-[#0e1f4d] text-base font-extrabold">Historial de reportes</h2>
-          {role !== "docente" && (
-            <button onClick={() => setReportOpen(true)} className="rounded-xl bg-[#0e1f4d] px-3 py-2 text-[11px] font-extrabold text-white hover:bg-[#172b62] transition">
-              Generar reporte
+          {role === "admin" && (
+            <button type="button" className="rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-extrabold text-white hover:bg-emerald-500 transition flex items-center gap-1.5 shadow-sm">
+              <span aria-hidden="true">↓</span> Descargar excel
             </button>
           )}
         </div>
@@ -943,8 +1013,8 @@ function HistorialScreen({ reports, materialRequests, role, onTab, tab }: { repo
                     <span className={`text-xs font-extrabold ${PRIORITY_BADGE[r.priority]}`}>{PRIORITY_LABELS[r.priority]}</span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[r.status]}`}>{r.status}</span>
                   </div>
-                  <p className="text-[#0e1f4d] text-sm font-semibold mt-0.5 leading-snug">{r.description}</p>
-                  <p className="text-gray-400 text-xs mt-0.5">{timeAgo(r.createdAt)}</p>
+                  <p className="text-[#0e1f4d] text-sm font-semibold mt-0.5 leading-snug">{r.elemento} · {r.salon}</p>
+                  <p className="text-gray-400 text-xs mt-0.5">{formatDateTime(r.createdAt)}</p>
                 </div>
               </div>
             </div>
@@ -955,42 +1025,13 @@ function HistorialScreen({ reports, materialRequests, role, onTab, tab }: { repo
         </div>
       </div>
       <TabBar active={tab} onChange={onTab} admin={role === "admin"} />
-      {reportOpen && (
-        <div className="absolute inset-0 z-20 flex items-end bg-[#0e1f4d]/30 p-3">
-          <div className="w-full max-h-[82%] overflow-y-auto rounded-[26px] bg-white p-5 shadow-xl">
-            <div className="flex items-start justify-between mb-5">
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#17c3ce]">Reporte mensual</p>
-                <h2 className="text-[#0e1f4d] text-lg font-extrabold mt-1 capitalize">{monthName}</h2>
-              </div>
-              <button onClick={() => setReportOpen(false)} className="text-slate-400 text-xl px-2">×</button>
-            </div>
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <div className="rounded-2xl bg-[#0e1f4d] p-4 text-white">
-                <p className="text-2xl font-extrabold">{monthlyReports.length}</p>
-                <p className="text-xs font-bold text-white/70 mt-1">Fallas completadas</p>
-              </div>
-              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-900">
-                <p className="text-2xl font-extrabold">${totalExpenses.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</p>
-                <p className="text-xs font-bold text-emerald-700 mt-1">Gasto registrado</p>
-              </div>
-            </div>
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-2">
-              <p className="text-xs font-extrabold text-[#0e1f4d]">Resumen de gastos</p>
-              <p className="text-xs text-slate-500">Compras aprobadas: <span className="font-extrabold text-[#0e1f4d]">{monthlyPurchases.length}</span></p>
-              {monthlyPurchases.length > 0 && totalExpenses === 0 && <p className="text-[11px] text-amber-700">Las solicitudes aprobadas aún no tienen un monto registrado.</p>}
-            </div>
-            <button onClick={() => setReportOpen(false)} className="w-full mt-5 rounded-full bg-[#17c3ce] py-3 text-sm font-extrabold text-white hover:bg-[#12a8b3] transition">Cerrar reporte</button>
-          </div>
-        </div>
-      )}
     </>
   );
 }
 
 /* ─── Administrador ─────────────────────────────────────── */
 function AdminScreen({
-  reports, requests, onTab, tab, onOpenFailures, onOpenMaterials, onNewReport,
+  reports, requests, onTab, tab, onOpenFailures, onOpenMaterials, onNewReport, onCancelReport,
 }: {
   reports: Report[];
   requests: MaterialRequest[];
@@ -999,9 +1040,13 @@ function AdminScreen({
   onOpenFailures: () => void;
   onOpenMaterials: () => void;
   onNewReport: (cat?: Category) => void;
+  onCancelReport: (id: string) => void;
 }) {
-  const activeFailures = reports.filter((report) => report.status !== "Resuelto").length;
+  const activeFailures = reports.filter((report) => report.status !== "Resuelto" && report.status !== "Cancelado").length;
   const pendingRequests = requests.filter((request) => request.status === "Pendiente de aprobación");
+  const [openReport, setOpenReport] = useState<string | null>(null);
+  const [confirmReport, setConfirmReport] = useState<string | null>(null);
+  const adminReports = reports.filter((report) => report.role === "admin" && report.status !== "Cancelado").slice(0, 3);
 
   return (
     <>
@@ -1028,9 +1073,48 @@ function AdminScreen({
             <h2 className="text-[#0e1f4d] text-lg font-extrabold leading-snug mb-3">¿Qué problema desea reportar hoy?</h2>
             <button onClick={() => onNewReport()} className="w-full bg-[#17c3ce] text-white font-extrabold py-3 rounded-full text-sm hover:bg-[#12a8b3] transition-all">Reportar nueva falla</button>
           </section>
+
+          <section className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+            <h3 className="text-[#0e1f4d] text-sm font-extrabold mb-3">Mis reportes recientes</h3>
+            {adminReports.length === 0 ? (
+              <p className="text-gray-400 text-xs text-center py-4">Sin reportes aún</p>
+            ) : (
+              <div className="space-y-2">
+                {adminReports.map((report) => (
+                  <div key={report.id} className="bg-[#f8fafc] rounded-xl px-4 py-3 flex items-center gap-3 shadow-sm border border-gray-100">
+                    <span className={`w-2.5 h-2.5 rounded-full flex-none ${PRIORITY_DOT[report.priority]}`} />
+                    <span className="flex-1 min-w-0 truncate text-xs text-[#0e1f4d] font-semibold">{report.elemento} · {report.salon}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-none ${STATUS_BADGE[report.status]}`}>{report.status}</span>
+                    {report.status !== "Resuelto" && (
+                      <div className="relative">
+                        <button type="button" aria-label={`Opciones de ${report.elemento}`} onClick={() => setOpenReport(openReport === report.id ? null : report.id)} className="w-7 h-7 rounded-lg text-slate-400 text-sm font-extrabold leading-none hover:bg-slate-200 transition">...</button>
+                        {openReport === report.id && (
+                          <div className="absolute right-0 top-8 z-10 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                            <button type="button" onClick={() => { setOpenReport(null); setConfirmReport(report.id); }} className="whitespace-nowrap rounded-lg px-3 py-2 text-xs font-extrabold text-red-600 hover:bg-red-50">Cancelar reporte</button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       </div>
       <TabBar active={tab} onChange={onTab} admin />
+      {confirmReport && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0e1f4d]/30 p-5">
+          <div className="w-full rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-[#0e1f4d] text-base font-extrabold">¿Cancelar este reporte?</h3>
+            <p className="text-slate-500 text-xs mt-2">Esta acción retirará el reporte de tu lista.</p>
+            <div className="grid grid-cols-2 gap-2 mt-5">
+              <button type="button" onClick={() => setConfirmReport(null)} className="rounded-xl border border-slate-200 py-2.5 text-xs font-extrabold text-slate-600 hover:bg-slate-50">Volver</button>
+              <button type="button" onClick={() => { onCancelReport(confirmReport); setConfirmReport(null); }} className="rounded-xl bg-red-600 py-2.5 text-xs font-extrabold text-white hover:bg-red-700">Cancelar reporte</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1078,25 +1162,38 @@ function AdminMaterialScreen({
 }
 
 /* ─── Perfil ─────────────────────────────────────────────── */
-function UsuariosScreen({ users, onAddTechnician, onDeleteUser, onOpenUsers, onTab, tab }: {
+function UsuariosScreen({ users, onAddTechnician, onDeleteUser, onOpenUsers, onViewAllUsers, onTab, tab }: {
   users: AppUser[];
-  onAddTechnician: (email: string, temporaryPassword: string) => void;
+  onAddTechnician: (email: string, temporaryPassword: string, role: "tecnico" | "admin") => void;
   onDeleteUser: (id: string) => void;
   onOpenUsers: (role: "tecnico" | "docente") => void;
+  onViewAllUsers: () => void;
   onTab: (t: Tab) => void;
   tab: Tab;
 }) {
   const [formOpen, setFormOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [selectedRole, setSelectedRole] = useState<"tecnico" | "admin">("tecnico");
+  const [selectedMetric, setSelectedMetric] = useState<"total" | "tecnico" | "docente" | "admin">("total");
   const technicians = users.filter((user) => user.role === "tecnico");
   const teachers = users.filter((user) => user.role === "docente");
+  const admins = users.filter((user) => user.role === "admin");
+  const metricList = [
+    { key: "total", label: "Total", count: users.length, style: "bg-[#0e1f4d] text-white" },
+    { key: "tecnico", label: "Técnicos", count: technicians.length, style: "bg-[#17c3ce] text-white" },
+    { key: "docente", label: "Docentes", count: teachers.length, style: "bg-white text-[#0e1f4d] border border-slate-200" },
+    { key: "admin", label: "Admins", count: admins.length, style: "bg-amber-50 text-amber-900 border border-amber-200" },
+  ] as const;
+
+  const visibleUsers = selectedMetric === "total" ? users : users.filter((user) => user.role === selectedMetric);
 
   function submitTechnician(e: React.FormEvent) {
     e.preventDefault();
-    onAddTechnician(email, temporaryPassword);
+    onAddTechnician(email, temporaryPassword, selectedRole);
     setEmail("");
     setTemporaryPassword("");
+    setSelectedRole("tecnico");
     setFormOpen(false);
   }
 
@@ -1106,40 +1203,74 @@ function UsuariosScreen({ users, onAddTechnician, onDeleteUser, onOpenUsers, onT
       <div className="flex-1 overflow-y-auto bg-[#f4f6fb] px-4 py-5 scrollbar-hide">
         <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#17c3ce]">Directorio</p>
         <h1 className="text-[#0e1f4d] text-xl font-extrabold mt-1 mb-5">Usuarios registrados</h1>
-        <div className="grid grid-cols-3 gap-2 mb-5">
-          {[
-            [users.length, "Total", "bg-[#0e1f4d] text-white"],
-            [technicians.length, "Técnicos", "bg-[#17c3ce] text-white"],
-            [teachers.length, "Docentes", "bg-white text-[#0e1f4d] border border-slate-200"],
-          ].map(([count, label, style]) => (
-            <div key={String(label)} className={`rounded-2xl p-3 ${style}`}>
-              <p className="text-2xl font-extrabold">{count}</p>
-              <p className="text-[10px] font-bold mt-1 opacity-75">{label}</p>
-            </div>
+
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {metricList.map((metric) => (
+            <button
+              key={metric.key}
+              type="button"
+              onClick={() => setSelectedMetric(metric.key)}
+              className={`rounded-2xl p-3 text-left shadow-sm transition ${metric.style} ${selectedMetric === metric.key ? "ring-2 ring-[#17c3ce] scale-[1.01]" : ""}`}
+            >
+              <p className="text-2xl font-extrabold leading-none">{metric.count}</p>
+              <p className="text-[9px] font-bold mt-2 uppercase tracking-[0.12em] opacity-75">{metric.label}</p>
+            </button>
           ))}
         </div>
 
-        <button onClick={() => onOpenUsers("tecnico")} className="w-full rounded-2xl bg-white border border-slate-200 px-4 py-3 mb-2 flex items-center justify-between text-sm font-extrabold text-[#0e1f4d] shadow-sm">
-          Técnicos <span className="text-slate-400">›</span>
-        </button>
-        <button onClick={() => onOpenUsers("docente")} className="w-full rounded-2xl bg-white border border-slate-200 px-4 py-3 mb-2 flex items-center justify-between text-sm font-extrabold text-[#0e1f4d] shadow-sm">
-          Docentes <span className="text-slate-400">›</span>
-        </button>
+        <div className="rounded-2xl bg-white border border-slate-200 p-3 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#0e1f4d]">
+              {selectedMetric === "total" ? "Todos" : selectedMetric === "tecnico" ? "Técnicos" : selectedMetric === "docente" ? "Docentes" : "Administradores"}
+            </p>
+            <span className="text-[10px] font-extrabold text-slate-500">{visibleUsers.length}</span>
+          </div>
+
+          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+            {visibleUsers.slice(0, 2).map((appUser) => (
+              <div key={appUser.id} className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+                <div className="w-8 h-8 rounded-full bg-[#17c3ce]/15 flex items-center justify-center text-[#0e1f4d] text-xs font-extrabold">{appUser.email.charAt(0).toUpperCase()}</div>
+                <span className="flex-1 min-w-0 truncate text-xs font-bold text-[#0e1f4d]">{appUser.email}</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400">{appUser.role}</span>
+              </div>
+            ))}
+            {visibleUsers.length === 0 && <p className="text-center text-xs text-slate-400 py-3">No hay usuarios registrados</p>}
+          </div>
+          {visibleUsers.length > 2 && (
+            <button type="button" onClick={onViewAllUsers} className="w-full mt-3 rounded-xl border border-[#17c3ce]/40 py-2 text-xs font-extrabold text-[#0e1f4d] hover:bg-[#17c3ce]/10 transition">
+              Ver mas
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex-none bg-white border-t border-slate-100 px-4 py-3">
-        <button onClick={() => setFormOpen(true)} className="w-full rounded-full bg-[#17c3ce] py-3 text-sm font-extrabold text-white hover:bg-[#12a8b3] transition">Agregar técnico</button>
+        <button onClick={() => setFormOpen(true)} className="w-full rounded-full bg-[#17c3ce] py-3 text-sm font-extrabold text-white hover:bg-[#12a8b3] transition">Agregar usuario</button>
       </div>
       <TabBar active={tab} onChange={onTab} admin />
       {formOpen && (
         <div className="absolute inset-0 z-20 flex items-end bg-[#0e1f4d]/30 p-3">
           <form onSubmit={submitTechnician} className="w-full rounded-[26px] bg-white p-5 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
-              <div><p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#17c3ce]">Nuevo acceso</p><h2 className="text-[#0e1f4d] text-lg font-extrabold mt-1">Agregar técnico</h2></div>
+              <div><p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#17c3ce]">Nuevo acceso</p><h2 className="text-[#0e1f4d] text-lg font-extrabold mt-1">Agregar usuario</h2></div>
               <button type="button" onClick={() => setFormOpen(false)} className="text-slate-400 text-xl px-2">×</button>
             </div>
-            <input required type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Correo del técnico" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:border-[#17c3ce]" />
-            <input required type="text" value={temporaryPassword} onChange={(e) => setTemporaryPassword(e.target.value)} placeholder="Contraseña temporal" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:border-[#17c3ce]" />
-            <button type="submit" className="w-full rounded-full bg-[#0e1f4d] py-3 text-sm font-extrabold text-white hover:bg-[#172b62] transition">Guardar técnico</button>
+
+            <div className="rounded-full bg-slate-100 p-1 flex gap-1">
+              {(["tecnico", "admin"] as const).map((role) => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => setSelectedRole(role)}
+                  className={`flex-1 rounded-full px-3 py-2 text-xs font-extrabold transition ${selectedRole === role ? "bg-[#0e1f4d] text-white shadow-sm" : "text-slate-500"}`}
+                >
+                  {role === "tecnico" ? "Tecnico" : "Administrador"}
+                </button>
+              ))}
+            </div>
+
+            <input required type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={selectedRole === "tecnico" ? "Correo del técnico" : "Correo del administrador"} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:border-[#17c3ce]" />
+            <input required type="password" value={temporaryPassword} onChange={(e) => setTemporaryPassword(e.target.value)} placeholder="Contraseña temporal" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:border-[#17c3ce]" />
+            <button type="submit" className="w-full rounded-full bg-[#0e1f4d] py-3 text-sm font-extrabold text-white hover:bg-[#172b62] transition">Guardar {selectedRole === "tecnico" ? "técnico" : "administrador"}</button>
           </form>
         </div>
       )}
@@ -1148,20 +1279,20 @@ function UsuariosScreen({ users, onAddTechnician, onDeleteUser, onOpenUsers, onT
 }
 
 function UsuariosListaScreen({ role, users, onDeleteUser, onTab, tab }: {
-  role: "tecnico" | "docente";
+  role: "tecnico" | "docente" | "all";
   users: AppUser[];
   onDeleteUser: (id: string) => void;
   onTab: (t: Tab) => void;
   tab: Tab;
 }) {
-  const label = role === "tecnico" ? "Tecnicos" : "Docentes";
+  const label = role === "all" ? "Todos los usuarios" : role === "tecnico" ? "Tecnicos" : "Docentes";
   return (
     <>
       <NavHeader title="Administracion" />
       <div className="flex-1 overflow-y-auto bg-[#f4f6fb] px-4 py-5 scrollbar-hide">
         <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#17c3ce]">Directorio</p>
         <h1 className="text-[#0e1f4d] text-xl font-extrabold mt-1 mb-5">{label}</h1>
-        <UserList users={users.filter((user) => user.role === role)} onDeleteUser={onDeleteUser} />
+        <UserList users={role === "all" ? users : users.filter((user) => user.role === role)} onDeleteUser={onDeleteUser} />
       </div>
       <TabBar active="usuarios" onChange={onTab} admin />
     </>
@@ -1235,7 +1366,7 @@ type Screen =
   | { name: "admin-fallas" }
   | { name: "admin-materiales" }
   | { name: "usuarios" }
-  | { name: "usuarios-list"; role: "tecnico" | "docente" };
+  | { name: "usuarios-list"; role: "tecnico" | "docente" | "all" };
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -1306,17 +1437,17 @@ export default function App() {
     }
   }
 
-  async function handleAddTechnician(email: string, temporaryPassword: string) {
+  async function handleAddTechnician(email: string, temporaryPassword: string, role: "tecnico" | "admin") {
     const newUser: AppUser = {
       id: `user-${Date.now()}`,
       email,
-      role: "tecnico",
+      role,
       temporaryPassword,
     };
     if (firebaseConfigured && db) {
       const created = await addDoc(collection(db, "users"), {
         email,
-        role: "tecnico",
+        role,
         temporaryPassword,
         createdAt: serverTimestamp(),
       });
@@ -1331,6 +1462,13 @@ export default function App() {
       await deleteDoc(doc(db, "users", id));
     }
     setAppUsers((current) => current.filter((appUser) => appUser.id !== id));
+  }
+
+  async function handleCancelReportByTeacher(id: string) {
+    if (firebaseConfigured && db) {
+      await updateDoc(doc(db, "reports", id), { status: "Cancelado" });
+    }
+    setReports((current) => current.map((report) => report.id === id ? { ...report, status: "Cancelado" } : report));
   }
 
   async function handleLogout() {
@@ -1379,6 +1517,7 @@ export default function App() {
         <HomeScreen
           user={effectiveUser} role={role} reports={reports}
           onNewReport={(cat) => setScreen({ name: "nueva", preCategory: cat })}
+          onCancelReport={role === "docente" ? handleCancelReportByTeacher : undefined}
           onTab={handleTab} tab={tab}
         />
       )}
@@ -1402,7 +1541,7 @@ export default function App() {
       )}
 
       {screen.name === "admin-fallas" && (
-        <MantenimientoScreen reports={reports} onDetail={() => undefined} onTab={handleTab} tab={tab} readOnly title="Administracion" />
+        <MantenimientoScreen reports={reports} onDetail={() => undefined} onTab={handleTab} tab={tab} readOnly title="Administracion" admin />
       )}
 
       {screen.name === "admin-materiales" && (
@@ -1426,7 +1565,7 @@ export default function App() {
       )}
 
       {screen.name === "usuarios" && (
-        <UsuariosScreen users={appUsers} onAddTechnician={(email, temporaryPassword) => void handleAddTechnician(email, temporaryPassword)} onDeleteUser={(id) => void handleDeleteUser(id)} onOpenUsers={(userRole) => setScreen({ name: "usuarios-list", role: userRole })} onTab={handleTab} tab={tab} />
+        <UsuariosScreen users={appUsers} onAddTechnician={(email, temporaryPassword, role) => void handleAddTechnician(email, temporaryPassword, role)} onDeleteUser={(id) => void handleDeleteUser(id)} onOpenUsers={(userRole) => setScreen({ name: "usuarios-list", role: userRole })} onViewAllUsers={() => setScreen({ name: "usuarios-list", role: "all" })} onTab={handleTab} tab={tab} />
       )}
 
       {screen.name === "usuarios-list" && (
@@ -1446,6 +1585,7 @@ export default function App() {
           onOpenFailures={() => setScreen({ name: "admin-fallas" })}
           onOpenMaterials={() => setScreen({ name: "admin-materiales" })}
           onNewReport={(cat) => setScreen({ name: "nueva", preCategory: cat, returnTo: "admin" })}
+          onCancelReport={(id) => void handleCancelReportByTeacher(id)}
         />
       )}
     </Shell>
