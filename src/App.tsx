@@ -15,11 +15,12 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  setDoc,
   Timestamp,
   deleteDoc,
 } from "firebase/firestore";
 import { auth, db, firebaseConfigured } from "./firebase";
-import logoRfm from "@/assets/logo_rfm.png";
+import logoRfm from "@/assets/logo_buhsab.png";
 
 /* ─── Demo data ─────────────────────────────────────────── */
 const DEMO_REPORTS: Report[] = [
@@ -88,11 +89,12 @@ const DEMO_USERS: AppUser[] = [
 type Role = "docente" | "tecnico" | "admin";
 type Priority = "Urgente" | "Media" | "Baja";
 type Status = "Pendiente" | "En proceso" | "Resuelto" | "Cancelado";
-type Category = "Minisplit/Clima" | "Chapas/Puertas" | "Eléctrico" | "Mobiliario" | "Plomería" | "Otro";
+type Category = "Minisplit/Clima" | "Chapas/Puertas" | "Eléctrico" | "Mobiliario" | "Plomería" | "Tecnología";
 type Tab = "home" | "usuarios" | "reportes" | "perfil";
 
 interface Report {
   id: string;
+  folio?: string;
   category: Category;
   priority: Priority;
   status: Status;
@@ -179,9 +181,9 @@ const CAT_ICON: Record<Category, string> = {
   Eléctrico: "💡",
   Mobiliario: "🪑",
   Plomería: "🔧",
-  Otro: "🔩",
+  Tecnología: "💻",
 };
-const CATEGORIES: Category[] = ["Minisplit/Clima", "Chapas/Puertas", "Eléctrico", "Mobiliario", "Plomería", "Otro"];
+const CATEGORIES: Category[] = ["Minisplit/Clima", "Chapas/Puertas", "Eléctrico", "Mobiliario", "Plomería", "Tecnología"];
 const PRIORITIES: Priority[] = ["Urgente", "Media", "Baja"];
 const STATUSES: Status[] = ["Pendiente", "En proceso", "Resuelto"];
 const AREAS = ["Aula 1", "Aula 2", "Aula 3", "Cinema", "Sala de usos múltiple", "Robótica", "Computación"];
@@ -514,8 +516,10 @@ function NuevaFallaScreen({
     setSending(true);
     const reportedBy = user.displayName || user.email?.split("@")[0] || "Usuario";
     if (demoMode) {
+      const folio = `R${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.toUpperCase().replace(/[^A-Z0-9]/g, "");
       onDemoAdd?.({
         id: `demo-${Date.now()}`,
+        folio,
         category, priority, salon, elemento, description,
         status: "Pendiente",
         reportedBy,
@@ -529,7 +533,9 @@ function NuevaFallaScreen({
       return;
     }
     try {
-      await addDoc(collection(db!, "reports"), {
+      const reportRef = doc(collection(db!, "reports"));
+      await setDoc(reportRef, {
+        folio: `R${reportRef.id.toUpperCase()}`,
         category, priority, salon, elemento, description,
         status: "Pendiente" as Status,
         reportedBy,
@@ -690,13 +696,13 @@ function MantenimientoScreen({
               </div>
               <p className="text-[#0e1f4d] text-sm font-extrabold leading-snug mb-0.5">{CAT_ICON[r.category]} {r.elemento} · {r.salon}</p>
               <p className="text-gray-400 text-xs">{formatDateTime(r.createdAt)} | {r.reportedBy}</p>
-              {!readOnly && <div className="flex gap-2 mt-3 flex-wrap">
+              {(!readOnly || admin) && <div className="flex gap-2 mt-3 flex-wrap">
                 <button onClick={() => onDetail(r.id)} className="text-xs font-bold text-[#0e1f4d] border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition">
                   Ver detalles
                 </button>
-                <button className="text-xs font-bold text-[#17c3ce] border border-[#17c3ce]/30 px-3 py-1.5 rounded-full hover:bg-[#17c3ce]/10 transition">
+                {!readOnly && <button className="text-xs font-bold text-[#17c3ce] border border-[#17c3ce]/30 px-3 py-1.5 rounded-full hover:bg-[#17c3ce]/10 transition">
                   Notificar arreglo 🔔
-                </button>
+                </button>}
               </div>}
             </div>
           ))}
@@ -714,16 +720,19 @@ function MantenimientoScreen({
    SCREEN 5 — Detalle del reporte
 ════════════════════════════════════════════════════════════ */
 function DetalleScreen({
-  report, onBack, demoMode, onDemoUpdate, onMaterialRequest,
+  report, onBack, demoMode, onDemoUpdate, onMaterialRequest, viewerRole, materialRequests, isHistory = false,
 }: {
   report: Report; onBack: () => void;
+  viewerRole: Role;
+  materialRequests: MaterialRequest[];
+  isHistory?: boolean;
   demoMode?: boolean; onDemoUpdate?: (id: string, data: Partial<Report>) => void;
   onMaterialRequest?: (request: MaterialRequest) => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [modal, setModal] = useState<"avance" | "material" | null>(null);
+  const [modal, setModal] = useState<"avance" | "material" | "ver-avances" | "ver-material" | null>(null);
   const [progressStatus, setProgressStatus] = useState<"En proceso" | "Pendiente">("En proceso");
   const [pendingReason, setPendingReason] = useState("Alumnos en clase");
   const [progressNotes, setProgressNotes] = useState("");
@@ -825,7 +834,7 @@ function DetalleScreen({
 
   return (
     <>
-      <NavHeader title="Tecnico" />
+      <NavHeader title={viewerRole === "admin" ? "Administracion" : viewerRole === "tecnico" ? "Tecnico" : "Docente"} />
       <div className="flex-none bg-white px-5 py-2.5 border-b border-gray-100">
         <button
           onClick={onBack}
@@ -837,7 +846,7 @@ function DetalleScreen({
       <div className="flex-1 overflow-y-auto bg-white px-5 py-4 space-y-4 scrollbar-hide">
         <div className="relative flex items-center justify-between">
           <h2 className="text-[#0e1f4d] text-base font-extrabold">Detalles del reporte</h2>
-          <div className="relative">
+          {viewerRole !== "docente" && <div className="relative">
             <button
               onClick={() => setMenuOpen((open) => !open)}
               aria-label="Más opciones"
@@ -847,26 +856,41 @@ function DetalleScreen({
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-11 z-10 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.16)]">
-                <button
-                  onClick={() => { setMenuOpen(false); setModal("avance"); }}
-                  disabled={saving}
-                  className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-extrabold text-blue-700 hover:bg-blue-50 transition disabled:opacity-60"
-                >
-                  Registrar avance
-                </button>
-                <button
-                  onClick={() => { setMenuOpen(false); setModal("material"); }}
-                  disabled={saving}
-                  className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-extrabold text-amber-700 hover:bg-amber-50 transition disabled:opacity-60"
-                >
-                  Solicitar material
-                </button>
+                {viewerRole === "admin" ? (
+                  <>
+                    <button onClick={() => { setMenuOpen(false); setModal("ver-avances"); }} className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-extrabold text-blue-700 hover:bg-blue-50 transition">{isHistory ? "Ver notas" : "Ver avances"}</button>
+                    <button onClick={() => { setMenuOpen(false); setModal("ver-material"); }} className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-extrabold text-amber-700 hover:bg-amber-50 transition">Ver material solicitado</button>
+                  </>
+                ) : viewerRole === "tecnico" && isHistory ? (
+                  <>
+                    <button onClick={() => { setMenuOpen(false); setModal("ver-avances"); }} className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-extrabold text-blue-700 hover:bg-blue-50 transition">Ver notas</button>
+                    <button onClick={() => { setMenuOpen(false); setModal("ver-material"); }} className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-extrabold text-amber-700 hover:bg-amber-50 transition">Ver material solicitado</button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => { setMenuOpen(false); setModal("avance"); }}
+                      disabled={saving}
+                      className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-extrabold text-blue-700 hover:bg-blue-50 transition disabled:opacity-60"
+                    >
+                      Registrar avance
+                    </button>
+                    <button
+                      onClick={() => { setMenuOpen(false); setModal("material"); }}
+                      disabled={saving}
+                      className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-extrabold text-amber-700 hover:bg-amber-50 transition disabled:opacity-60"
+                    >
+                      Solicitar material
+                    </button>
+                  </>
+                )}
               </div>
             )}
-          </div>
+          </div>}
         </div>
 
         <div className="bg-gray-50 rounded-2xl p-4 space-y-1.5 text-xs">
+          <p><span className="font-bold text-gray-400">Folio:</span> <span className="text-[#0e1f4d] font-extrabold ml-1">{(report.folio ?? report.id).replace(/[^a-z0-9]/gi, "").toUpperCase()}</span></p>
           <p><span className="font-bold text-gray-400">Ubicación:</span> <span className="text-[#0e1f4d] font-bold ml-1">{report.salon}</span></p>
           <p><span className="font-bold text-gray-400">Solicitante:</span> <span className="text-[#0e1f4d] font-bold ml-1">{report.reportedBy}</span></p>
           <p><span className="font-bold text-gray-400">Categoría:</span> <span className="text-[#0e1f4d] font-bold ml-1">{CAT_ICON[report.category]} {report.category}</span></p>
@@ -965,12 +989,59 @@ function DetalleScreen({
         </div>
       )}
 
-      <div className="flex flex-col items-center gap-2 px-5 pt-3 pb-6 bg-white border-t border-gray-100 flex-none">
+      {modal === "ver-avances" && (
+        <div className="absolute inset-0 z-20 flex items-end bg-[#0e1f4d]/30 p-3">
+          <div className="w-full max-h-[82%] overflow-y-auto rounded-[26px] bg-white p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#17c3ce]">Seguimiento del técnico</p>
+                <h3 className="text-[#0e1f4d] text-lg font-extrabold">{isHistory ? "Notas del técnico" : "Avances registrados"}</h3>
+              </div>
+              <button type="button" onClick={() => setModal(null)} aria-label="Cerrar" className="text-slate-400 text-xl px-2">×</button>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-3 space-y-2 text-xs">
+              <p><span className="font-bold text-slate-500">Estado:</span> <span className="font-extrabold text-[#0e1f4d]">{report.status}</span></p>
+              {report.motivoPendiente && <p><span className="font-bold text-slate-500">Motivo pendiente:</span> <span className="text-[#0e1f4d]">{report.motivoPendiente}</span></p>}
+              <p><span className="font-bold text-slate-500">Notas:</span> <span className="text-[#0e1f4d]">{report.notasAvance || report.acciones || "El técnico aún no registra avances."}</span></p>
+              {report.evidenciaNombre && <p><span className="font-bold text-slate-500">Evidencia:</span> <span className="text-[#0e1f4d]">{report.evidenciaNombre}</span></p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === "ver-material" && (
+        <div className="absolute inset-0 z-20 flex items-end bg-[#0e1f4d]/30 p-3">
+          <div className="w-full max-h-[82%] overflow-y-auto rounded-[26px] bg-white p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#17c3ce]">Solicitudes del técnico</p>
+                <h3 className="text-[#0e1f4d] text-lg font-extrabold">Material solicitado</h3>
+              </div>
+              <button type="button" onClick={() => setModal(null)} aria-label="Cerrar" className="text-slate-400 text-xl px-2">×</button>
+            </div>
+            <div className="space-y-2">
+              {materialRequests.filter((request) => request.reportId === report.id).map((request) => (
+                <div key={request.id} className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-sm font-extrabold text-[#0e1f4d]">{request.material}</p>
+                  <p className="text-xs text-slate-600 mt-1">{request.observation}</p>
+                  <p className="text-xs font-bold text-emerald-700 mt-2">Costo aproximado: ${(request.estimatedCost ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">{request.status} · {formatDateTime(request.createdAt)}</p>
+                </div>
+              ))}
+              {materialRequests.filter((request) => request.reportId === report.id).length === 0 && (
+                <p className="rounded-xl bg-slate-50 py-6 text-center text-xs text-slate-500">No se ha solicitado material para este reporte.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewerRole === "tecnico" && !isHistory && <div className="flex flex-col items-center gap-2 px-5 pt-3 pb-6 bg-white border-t border-gray-100 flex-none">
         {actionMessage && <p className="text-center text-xs font-bold text-emerald-600">{actionMessage}</p>}
         <button onClick={() => void handleResolve()} disabled={saving || report.status === "Cancelado"} className="w-full max-w-xs bg-[#17c3ce] text-white font-extrabold py-3 px-5 rounded-full text-sm hover:bg-[#12a8b3] transition disabled:opacity-60">
           {saving ? "Guardando..." : "Marcar como resuelto"}
         </button>
-      </div>
+      </div>}
     </>
   );
 }
@@ -978,7 +1049,7 @@ function DetalleScreen({
 /* ════════════════════════════════════════════════════════════
    SCREEN 6 — Historial
 ════════════════════════════════════════════════════════════ */
-function HistorialScreen({ reports, materialRequests, role, onTab, tab }: { reports: Report[]; materialRequests: MaterialRequest[]; role: Role; onTab: (t: Tab) => void; tab: Tab }) {
+function HistorialScreen({ reports, materialRequests, role, onDetail, onTab, tab }: { reports: Report[]; materialRequests: MaterialRequest[]; role: Role; onDetail: (id: string) => void; onTab: (t: Tab) => void; tab: Tab }) {
   const currentDate = new Date();
   const monthName = currentDate.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
   const isCurrentMonth = (timestamp: Timestamp | null) => {
@@ -1005,7 +1076,7 @@ function HistorialScreen({ reports, materialRequests, role, onTab, tab }: { repo
         </div>
         <div className="space-y-2">
           {visibleReports.map((r) => (
-            <div key={r.id} className="bg-white rounded-2xl px-4 py-3 shadow-sm border border-gray-100">
+            <button key={r.id} type="button" onClick={() => onDetail(r.id)} className="w-full text-left bg-white rounded-2xl px-4 py-3 shadow-sm border border-gray-100 hover:border-[#17c3ce]/50 transition">
               <div className="flex items-start gap-3">
                 <span className={`w-3 h-3 rounded-full flex-none mt-0.5 ${PRIORITY_DOT[r.priority]}`} />
                 <div className="flex-1 min-w-0">
@@ -1017,7 +1088,7 @@ function HistorialScreen({ reports, materialRequests, role, onTab, tab }: { repo
                   <p className="text-gray-400 text-xs mt-0.5">{formatDateTime(r.createdAt)}</p>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
           {visibleReports.length === 0 && (
             <div className="text-center py-12 text-gray-400 text-sm">Sin reportes registrados</div>
@@ -1081,20 +1152,22 @@ function AdminScreen({
             ) : (
               <div className="space-y-2">
                 {adminReports.map((report) => (
-                  <div key={report.id} className="bg-[#f8fafc] rounded-xl px-4 py-3 flex items-center gap-3 shadow-sm border border-gray-100">
-                    <span className={`w-2.5 h-2.5 rounded-full flex-none ${PRIORITY_DOT[report.priority]}`} />
-                    <span className="flex-1 min-w-0 truncate text-xs text-[#0e1f4d] font-semibold">{report.elemento} · {report.salon}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-none ${STATUS_BADGE[report.status]}`}>{report.status}</span>
-                    {report.status !== "Resuelto" && (
-                      <div className="relative">
-                        <button type="button" aria-label={`Opciones de ${report.elemento}`} onClick={() => setOpenReport(openReport === report.id ? null : report.id)} className="w-7 h-7 rounded-lg text-slate-400 text-sm font-extrabold leading-none hover:bg-slate-200 transition">...</button>
-                        {openReport === report.id && (
-                          <div className="absolute right-0 top-8 z-10 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-                            <button type="button" onClick={() => { setOpenReport(null); setConfirmReport(report.id); }} className="whitespace-nowrap rounded-lg px-3 py-2 text-xs font-extrabold text-red-600 hover:bg-red-50">Cancelar reporte</button>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                  <div key={report.id}>
+                    <div className="bg-[#f8fafc] rounded-xl px-4 py-3 flex items-center gap-3 shadow-sm border border-gray-100">
+                      <span className={`w-2.5 h-2.5 rounded-full flex-none ${PRIORITY_DOT[report.priority]}`} />
+                      <span className="flex-1 min-w-0 truncate text-xs text-[#0e1f4d] font-semibold">{report.elemento} · {report.salon}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-none ${STATUS_BADGE[report.status]}`}>{report.status}</span>
+                      {report.status !== "Resuelto" && (
+                        <div className="relative">
+                          <button type="button" aria-label={`Opciones de ${report.elemento}`} onClick={() => setOpenReport(openReport === report.id ? null : report.id)} className="w-7 h-7 rounded-lg text-slate-400 text-sm font-extrabold leading-none hover:bg-slate-200 transition">...</button>
+                          {openReport === report.id && (
+                            <div className="absolute right-0 top-8 z-10 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                              <button type="button" onClick={() => { setOpenReport(null); setConfirmReport(report.id); }} className="whitespace-nowrap rounded-lg px-3 py-2 text-xs font-extrabold text-red-600 hover:bg-red-50">Cancelar reporte</button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1120,10 +1193,11 @@ function AdminScreen({
 }
 
 function AdminMaterialScreen({
-  requests, onRequestStatus, onTab, tab,
+  requests, onRequestStatus, onViewHistory, onTab, tab,
 }: {
   requests: MaterialRequest[];
   onRequestStatus: (id: string, status: "Aprobada" | "Rechazada") => void;
+  onViewHistory: () => void;
   onTab: (t: Tab) => void;
   tab: Tab;
 }) {
@@ -1154,6 +1228,79 @@ function AdminMaterialScreen({
             </div>
           ))}
           {pendingRequests.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 py-12 text-center text-sm text-slate-400">No hay autorizaciones pendientes</div>}
+        </div>
+      </div>
+      <div className="flex-none bg-white border-t border-slate-100 px-4 py-3">
+        <button type="button" onClick={onViewHistory} className="w-full rounded-full border border-[#17c3ce] py-3 text-sm font-extrabold text-[#0e1f4d] hover:bg-[#17c3ce]/10 transition">
+          Ver historial
+        </button>
+      </div>
+      <TabBar active={tab} onChange={onTab} admin />
+    </>
+  );
+}
+
+function AdminMaterialHistoryScreen({ requests, onTab, tab }: {
+  requests: MaterialRequest[];
+  onTab: (t: Tab) => void;
+  tab: Tab;
+}) {
+  const [statusFilter, setStatusFilter] = useState<"Todas" | "Aprobada" | "Rechazada">("Todas");
+  const [dateFilter, setDateFilter] = useState("");
+  const history = requests.filter((request) => request.status === "Aprobada" || request.status === "Rechazada");
+  const filteredRequests = history.filter((request) => {
+    const matchesStatus = statusFilter === "Todas" || request.status === statusFilter;
+    const requestDate = request.createdAt?.toDate();
+    const requestDateKey = requestDate
+      ? `${requestDate.getFullYear()}-${String(requestDate.getMonth() + 1).padStart(2, "0")}-${String(requestDate.getDate()).padStart(2, "0")}`
+      : "";
+    return matchesStatus && (!dateFilter || requestDateKey === dateFilter);
+  });
+
+  return (
+    <>
+      <NavHeader title="Administracion" />
+      <div className="flex-1 overflow-y-auto bg-[#f4f6fb] px-4 py-5 scrollbar-hide">
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#17c3ce]">Finanzas / Administración</p>
+        <h1 className="text-[#0e1f4d] text-xl font-extrabold mt-1 mb-5">Historial de materiales</h1>
+
+        <div className="mb-4 rounded-2xl bg-white border border-slate-200 p-3 space-y-3">
+          <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
+            {(["Todas", "Aprobada", "Rechazada"] as const).map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setStatusFilter(status)}
+                className={`rounded-lg py-2 text-[10px] font-extrabold transition ${statusFilter === status ? "bg-white text-[#0e1f4d] shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              >
+                {status === "Todas" ? "Todos" : status === "Aprobada" ? "Aprobado" : "Rechazado"}
+              </button>
+            ))}
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">Filtrar por fecha</span>
+            <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-[#17c3ce]" />
+          </label>
+          {dateFilter && <button type="button" onClick={() => setDateFilter("")} className="text-xs font-bold text-[#0e1f4d] underline">Limpiar fecha</button>}
+        </div>
+
+        <div className="space-y-3">
+          {filteredRequests.map((request) => (
+            <div key={request.id} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[#0e1f4d] text-sm font-extrabold leading-snug">{request.material}</p>
+                  <p className="text-slate-500 text-xs mt-1 leading-snug">{request.observation}</p>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-extrabold ${request.status === "Aprobada" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                  {request.status}
+                </span>
+              </div>
+              <p className="text-emerald-700 text-xs font-extrabold mt-3">Costo aproximado: ${(request.estimatedCost ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}</p>
+              <p className="text-slate-400 text-[10px] font-bold mt-2">Solicitado por {request.requestedBy} · {formatDateTime(request.createdAt)}</p>
+            </div>
+          ))}
+          {filteredRequests.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 py-12 text-center text-sm text-slate-400">No hay materiales para estos filtros</div>}
         </div>
       </div>
       <TabBar active={tab} onChange={onTab} admin />
@@ -1359,12 +1506,13 @@ type Screen =
   | { name: "home" }
   | { name: "nueva"; preCategory?: Category; returnTo?: "home" | "admin" }
   | { name: "mantenimiento" }
-  | { name: "detalle"; reportId: string }
+  | { name: "detalle"; reportId: string; returnTo: "mantenimiento" | "admin-fallas" | "historial" }
   | { name: "historial" }
   | { name: "perfil" }
   | { name: "admin" }
   | { name: "admin-fallas" }
   | { name: "admin-materiales" }
+  | { name: "admin-materiales-historial" }
   | { name: "usuarios" }
   | { name: "usuarios-list"; role: "tecnico" | "docente" | "all" };
 
@@ -1535,23 +1683,30 @@ export default function App() {
       {screen.name === "mantenimiento" && (
         <MantenimientoScreen
           reports={reports}
-          onDetail={(id) => setScreen({ name: "detalle", reportId: id })}
+          onDetail={(id) => setScreen({ name: "detalle", reportId: id, returnTo: "mantenimiento" })}
           onTab={handleTab} tab={tab}
         />
       )}
 
       {screen.name === "admin-fallas" && (
-        <MantenimientoScreen reports={reports} onDetail={() => undefined} onTab={handleTab} tab={tab} readOnly title="Administracion" admin />
+        <MantenimientoScreen reports={reports} onDetail={(id) => setScreen({ name: "detalle", reportId: id, returnTo: "admin-fallas" })} onTab={handleTab} tab={tab} readOnly title="Administracion" admin />
       )}
 
       {screen.name === "admin-materiales" && (
-        <AdminMaterialScreen requests={materialRequests} onRequestStatus={(id, status) => void handleRequestStatus(id, status)} onTab={handleTab} tab={tab} />
+        <AdminMaterialScreen requests={materialRequests} onRequestStatus={(id, status) => void handleRequestStatus(id, status)} onViewHistory={() => setScreen({ name: "admin-materiales-historial" })} onTab={handleTab} tab={tab} />
+      )}
+
+      {screen.name === "admin-materiales-historial" && (
+        <AdminMaterialHistoryScreen requests={materialRequests} onTab={handleTab} tab={tab} />
       )}
 
       {screen.name === "detalle" && selectedReport && (
         <DetalleScreen
           report={selectedReport}
-          onBack={() => setScreen({ name: "mantenimiento" })}
+          viewerRole={role}
+          materialRequests={materialRequests}
+          isHistory={screen.returnTo === "historial"}
+          onBack={() => setScreen(screen.returnTo === "historial" ? { name: "historial" } : screen.returnTo === "admin-fallas" ? { name: "admin-fallas" } : { name: "mantenimiento" })}
           demoMode={!firebaseConfigured}
           onDemoUpdate={(id, data) =>
             setReports((prev) => prev.map((r) => r.id === id ? { ...r, ...data } : r))
@@ -1561,7 +1716,7 @@ export default function App() {
       )}
 
       {screen.name === "historial" && (
-        <HistorialScreen reports={reports} materialRequests={materialRequests} role={role} onTab={handleTab} tab={tab} />
+        <HistorialScreen reports={reports} materialRequests={materialRequests} role={role} onDetail={(id) => setScreen({ name: "detalle", reportId: id, returnTo: "historial" })} onTab={handleTab} tab={tab} />
       )}
 
       {screen.name === "usuarios" && (
