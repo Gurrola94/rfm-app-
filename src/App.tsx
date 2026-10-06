@@ -186,7 +186,7 @@ const CAT_ICON: Record<Category, string> = {
 const CATEGORIES: Category[] = ["Minisplit/Clima", "Chapas/Puertas", "Eléctrico", "Mobiliario", "Plomería", "Tecnología"];
 const PRIORITIES: Priority[] = ["Urgente", "Media", "Baja"];
 const STATUSES: Status[] = ["Pendiente", "En proceso", "Resuelto"];
-const AREAS = ["Aula 1", "Aula 2", "Aula 3", "Aula 4", "Aula 5", "Aula 6", "Aula 7", "Aula 8", "Aula 9", "Aula 10", "Aula 11", "Aula 12", "Aula 13", "Aula 14", "Aula 15", "Aula 16", "Cinema", "Sala de usos múltiple", "Robótica", "Dirección", "Happy", "Oficina Principal", "Coordinación Planta Alta", "Música", "Taekwondo", "Psicología",  "Enfermería"];
+const AREAS = ["Aula 1", "Aula 2", "Aula 3", "Aula 4", "Aula 5", "Aula 6", "Aula 7", "Aula 8", "Aula 9", "Aula 10", "Aula 11", "Aula 12", "Aula 13", "Aula 14", "Aula 15", "Aula 16", "Cinema", "Sala de usos múltiple", "Robótica", "Computación", "Dirección", "Happy", "Oficina Principal", "Coordinación Planta Alta", "Música", "Taekwondo", "Psicología",  "Enfermería"];
 
 /* ─── Shell ─────────────────────────────────────────────── */
 function Shell({ children }: { children: React.ReactNode }) {
