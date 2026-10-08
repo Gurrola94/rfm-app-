@@ -7,14 +7,25 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "cap:sync": "vite build && cap sync",
+    "android": "npm run cap:sync && cap open android",
+    "ios": "npm run cap:sync && cap open ios",
+    "assets": "capacitor-assets generate --android --ios --iconBackgroundColor #0e1f4d --iconBackgroundColorDark #0e1f4d --splashBackgroundColor #0e1f4d --splashBackgroundColorDark #0e1f4d"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
+    "@capacitor/status-bar": "^8.0.4",
     "firebase": "^12.18.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",

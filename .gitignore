@@ -10,3 +10,8 @@ vite.config.*.timestamp-*
 *-debug.log*
 logs/
 *.log
+
+# Llaves de firma de Android (nunca subir)
+*.jks
+*.keystore
+keystore.properties
