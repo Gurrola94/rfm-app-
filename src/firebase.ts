@@ -1,28 +1,31 @@
-import { initializeApp, FirebaseApp } from "firebase/app";
+import { initializeApp, getApp, getApps, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { getDatabase, Database } from "firebase/database";
 
-const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+};
 
 export const firebaseConfigured =
-  typeof apiKey === "string" && apiKey.length > 10 && !apiKey.startsWith("AIza_DEMO");
+  typeof firebaseConfig.apiKey === "string" &&
+  firebaseConfig.apiKey.length > 10 &&
+  typeof firebaseConfig.databaseURL === "string" &&
+  firebaseConfig.databaseURL.length > 0;
 
 let app: FirebaseApp | null = null;
-let _auth: Auth | null = null;
-let _db: Firestore | null = null;
+let auth: Auth | null = null;
+let db: Database | null = null;
 
 if (firebaseConfigured) {
-  app = initializeApp({
-    apiKey,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  });
-  _auth = getAuth(app);
-  _db = getFirestore(app);
+  app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getDatabase(app);
 }
 
-export const auth = _auth;
-export const db = _db;
+export { auth, db };
