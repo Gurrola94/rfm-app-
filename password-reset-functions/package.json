@@ -1,0 +1,15 @@
+{
+  "name": "password-reset-functions",
+  "private": true,
+  "main": "password-reset.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "lint": "node --check password-reset.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^6.4.0"
+  }
+}

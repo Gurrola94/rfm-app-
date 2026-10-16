@@ -1,6 +1,7 @@
 import { initializeApp, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
+import { getFunctions, Functions } from "firebase/functions";
 
 const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
 
@@ -10,6 +11,7 @@ export const firebaseConfigured =
 let app: FirebaseApp | null = null;
 let _auth: Auth | null = null;
 let _db: Firestore | null = null;
+let _functions: Functions | null = null;
 
 if (firebaseConfigured) {
   app = initializeApp({
@@ -22,7 +24,9 @@ if (firebaseConfigured) {
   });
   _auth = getAuth(app);
   _db = getFirestore(app);
+  _functions = getFunctions(app, "us-central1");
 }
 
 export const auth = _auth;
 export const db = _db;
+export const functions = _functions;

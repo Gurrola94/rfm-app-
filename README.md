@@ -22,6 +22,18 @@ Para generar la versión de producción:
 npm run build
 ```
 
+### Recuperación de contraseña
+
+El envío de códigos de recuperación usa Firebase Functions y Resend. Para desplegar las funciones, selecciona primero el proyecto Firebase y configura:
+
+```bash
+firebase functions:secrets:set RESEND_API_KEY
+firebase functions:secrets:set PASSWORD_RESET_CODE_PEPPER
+firebase deploy --only functions
+```
+
+Durante el despliegue, Firebase solicita `PASSWORD_RESET_EMAIL_FROM`; ingresa un remitente verificado en Resend, por ejemplo `RFM BUHSAB <cuentas@tu-dominio-verificado.mx>`. Los usuarios deben existir tanto en Firebase Authentication como en la colección `users` de Firestore con su correo en el campo `email`.
+
 ## Variables de entorno
 
 Copia `.env.example` a `.env` y llena los valores de tu proyecto de Firebase.
