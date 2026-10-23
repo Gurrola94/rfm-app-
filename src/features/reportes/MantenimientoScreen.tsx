@@ -12,6 +12,15 @@ export function MantenimientoScreen({
 }) {
   const pending = reports.filter((r) => r.status !== "Resuelto" && r.status !== "Cancelado");
 
+
+  console.log("Estados de reportes:", reports.map((r) => ({
+  id: r.id,
+  folio: r.folio,
+  status: r.status,
+})));
+
+console.log("Reportes pendientes:", pending.map((r) => r.folio));
+
   return (
     <>
       <NavHeader title={title} />
