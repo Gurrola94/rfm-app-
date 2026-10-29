@@ -6,7 +6,7 @@ import { NavHeader } from "@/components/layout/NavHeader";
 import { CAT_ICON, PRIORITY_BADGE, PRIORITY_LABELS, STATUS_BADGE } from "@/constants";
 import type { Avance, MaterialRequest, Report, Role } from "@/types";
 import { formatDateTime } from "@/utils/format";
-import { compressImage } from "@/utils/image";
+import { takePhoto } from "@/utils/image";
 
 export function DetalleScreen({
   report, onBack, demoMode, onDemoUpdate, onMaterialRequest, onRequestStatus, requesterName, viewerRole, materialRequests, isHistory = false,
@@ -177,13 +177,13 @@ export function DetalleScreen({
     }
   }
 
-  async function handleFotoResuelto(file?: File) {
-    if (!file) return;
+  async function handleFotoResuelto() {
     try {
-      setFotoResuelto(await compressImage(file));
+      const foto = await takePhoto("camera");
+      if (foto) setFotoResuelto(foto);
     } catch (err) {
       console.error(err);
-      setActionMessage("No se pudo cargar la foto");
+      setActionMessage("No se pudo abrir la cámara");
     }
   }
 
@@ -351,15 +351,23 @@ export function DetalleScreen({
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1.5 block">Foto de evidencia (Opcional)</label>
-              <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-500 hover:bg-slate-100 transition">
-                {evidenceName || "Seleccionar fotografía"}
-                <input type="file" accept="image/*" onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  setEvidenceName(f?.name ?? "");
-                  setEvidenceFoto("");
-                  if (f) compressImage(f, 600, 0.6).then(setEvidenceFoto).catch(() => setActionMessage("No se pudo cargar la foto"));
-                }} className="hidden" />
-              </label>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const foto = await takePhoto("prompt", 600, 60);
+                    if (foto) {
+                      setEvidenceFoto(foto);
+                      setEvidenceName("Foto de evidencia");
+                    }
+                  } catch {
+                    setActionMessage("No se pudo cargar la foto");
+                  }
+                }}
+                className="flex w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-500 hover:bg-slate-100 transition"
+              >
+                {evidenceFoto ? "Foto lista · toca para cambiarla" : "Tomar o seleccionar fotografía"}
+              </button>
             </div>
             <button type="submit" disabled={saving} className="w-full rounded-full bg-[#17c3ce] py-3 text-sm font-extrabold text-white hover:bg-[#12a8b3] transition disabled:opacity-60">{saving ? "Guardando..." : "Guardar avance"}</button>
           </form>
@@ -468,11 +476,14 @@ export function DetalleScreen({
 
       {viewerRole === "tecnico" && !isHistory && <div className="flex flex-col items-center gap-2 px-5 pt-3 pb-6 bg-white border-t border-gray-100 flex-none">
         {actionMessage && <p className="text-center text-xs font-bold text-emerald-600">{actionMessage}</p>}
-        <label className="flex w-full max-w-xs cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-100 transition">
+        <button
+          type="button"
+          onClick={() => void handleFotoResuelto()}
+          className="flex w-full max-w-xs cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-100 transition"
+        >
           {fotoResuelto ? <img src={fotoResuelto} alt="Evidencia" className="h-8 w-8 rounded object-cover" /> : <span aria-hidden="true">📷</span>}
           {fotoResuelto ? "Cambiar foto de lo reparado" : "Foto de lo reparado (evidencia)"}
-          <input type="file" accept="image/*" capture="environment" onChange={(e) => void handleFotoResuelto(e.target.files?.[0])} className="hidden" />
-        </label>
+        </button>
         <button onClick={() => void handleResolve()} disabled={saving || report.status === "Cancelado"} className="w-full max-w-xs bg-[#17c3ce] text-white font-extrabold py-3 px-5 rounded-full text-sm hover:bg-[#12a8b3] transition disabled:opacity-60">
           {saving ? "Guardando..." : "Marcar como resuelto"}
         </button>
