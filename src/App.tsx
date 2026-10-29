@@ -38,7 +38,17 @@ export default function App() {
   // Demo mode user substitute
   const [demoUser] = useState({ uid: "demo-uid", email: "demo@buhsab.mx", displayName: "Demo" });
 
-  useFirebaseSync({ setUser, setAuthLoading, setScreen, setAppUsers, setExtraSpaces, setMaterialRequests, setReports });
+  useFirebaseSync({
+  user,
+  setUser,
+  setAuthLoading,
+  setScreen,
+  setAppUsers,
+  setExtraSpaces,
+  setMaterialRequests,
+  setReports,
+  onSessionRestored: (u, r) => handleLogin(u, r),
+});
   useStatusBarStyle();
   useAndroidBackButton(handleHardwareBack);
 
