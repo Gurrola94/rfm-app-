@@ -1,0 +1,32 @@
+﻿diff --cc src/features/reportes/MantenimientoScreen.tsx
+index c6eb37c,49c262d..0000000
+--- a/src/features/reportes/MantenimientoScreen.tsx
++++ b/src/features/reportes/MantenimientoScreen.tsx
+@@@ -12,13 -10,17 +12,27 @@@ export function MantenimientoScreen(
+    reports: Report[]; onDetail: (id: string) => void; onTab: (t: Tab) => void; tab: Tab;
+    readOnly?: boolean; title?: string; admin?: boolean;
+  }) {
+++<<<<<<< HEAD
+ +  const pending = reports
+ +  .filter((r) => r.status !== "Resuelto" && r.status !== "Cancelado")
+ +  .sort((a, b) => {
+ +    const porPrioridad = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+ +    if (porPrioridad !== 0) return porPrioridad;
+ +    return (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0);
+ +  });
+++=======
++   const pending = reports.filter((r) => r.status !== "Resuelto" && r.status !== "Cancelado");
++ 
++ 
++   console.log("Estados de reportes:", reports.map((r) => ({
++   id: r.id,
++   folio: r.folio,
++   status: r.status,
++ })));
++ 
++ console.log("Reportes pendientes:", pending.map((r) => r.folio));
++ 
+++>>>>>>> origin/main
+    return (
+      <>
+        <NavHeader title={title} />

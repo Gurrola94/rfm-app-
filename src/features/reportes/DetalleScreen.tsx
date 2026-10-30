@@ -285,12 +285,12 @@ export function DetalleScreen({
           {report.description && <p><span className="font-bold text-gray-400">Descripción:</span> <span className="text-[#0e1f4d] ml-1">{report.description}</span></p>}
         </div>
 
-        <div>
-          <p className="text-xs font-bold text-gray-400 mb-1.5">Foto del reporte:</p>
-          <div className="w-full h-32 bg-gradient-to-b from-sky-200 to-green-200 rounded-2xl flex items-end justify-center overflow-hidden">
-            <div className="w-full h-10 bg-green-400 rounded-t-full" />
+        {report.foto && (
+          <div>
+            <p className="text-xs font-bold text-gray-400 mb-1.5">Foto del reporte:</p>
+            <img src={report.foto} alt="Foto del reporte" className="w-full rounded-2xl object-cover" />
           </div>
-        </div>
+        )}
 
         {((report.avances?.length ?? 0) > 0 || report.notasAvance) && (
           <div>

@@ -21,6 +21,7 @@ import { UsuariosScreen } from "@/features/usuarios/UsuariosScreen";
 import { AdminScreen } from "@/features/admin/AdminScreen";
 import { useFirebaseSync } from "@/hooks/useFirebaseSync";
 import { useAndroidBackButton, useStatusBarStyle } from "@/hooks/useNative";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import type { AppUser, Category, MaterialRequest, Report, Role, Screen, Tab } from "@/types";
 
 export default function App() {
@@ -52,6 +53,7 @@ export default function App() {
   });
 
   useStatusBarStyle();
+  usePushNotifications(user, role);
   useAndroidBackButton(handleHardwareBack);
 
 
