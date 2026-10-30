@@ -38,19 +38,22 @@ export default function App() {
   // Demo mode user substitute
   const [demoUser] = useState({ uid: "demo-uid", email: "demo@buhsab.mx", displayName: "Demo" });
 
+
   useFirebaseSync({
-  user,
-  setUser,
-  setAuthLoading,
-  setScreen,
-  setAppUsers,
-  setExtraSpaces,
-  setMaterialRequests,
-  setReports,
-  onSessionRestored: (u, r) => handleLogin(u, r),
-});
+    user,
+    setUser,
+    setAuthLoading,
+    setScreen,
+    setAppUsers,
+    setExtraSpaces,
+    setMaterialRequests,
+    setReports,
+    onSessionRestored: (u, r) => handleLogin(u, r),
+  });
+
   useStatusBarStyle();
   useAndroidBackButton(handleHardwareBack);
+
 
   const effectiveUser = firebaseConfigured ? user : (demoUser as unknown as User);
 
@@ -99,6 +102,20 @@ export default function App() {
       setAppUsers((current) => [...current, newUser]);
     }
   }
+
+
+    async function handleUpdateUserRole(id: string, role: Role) {
+      if (firebaseConfigured && db) {
+        await updateDoc(doc(db, "users", id), { role });
+      }
+
+      setAppUsers((current) =>
+        current.map((appUser) =>
+          appUser.id === id ? { ...appUser, role } : appUser
+        )
+      );
+    }
+
 
   async function handleDeleteUser(id: string) {
     if (firebaseConfigured && db) {
@@ -262,9 +279,20 @@ export default function App() {
         <HistorialScreen reports={reports} materialRequests={materialRequests} role={role} onDetail={(id) => setScreen({ name: "detalle", reportId: id, returnTo: "historial" })} onTab={handleTab} tab={tab} />
       )}
 
-      {screen.name === "usuarios" && (
-        <UsuariosScreen users={appUsers} onAddTechnician={(email, temporaryPassword, role) => void handleAddTechnician(email, temporaryPassword, role)} onDeleteUser={(id) => void handleDeleteUser(id)} onOpenUsers={(userRole) => setScreen({ name: "usuarios-list", role: userRole })} onViewAllUsers={() => setScreen({ name: "usuarios-list", role: "all" })} onTab={handleTab} tab={tab} />
-      )}
+
+        {screen.name === "usuarios" && (
+          <UsuariosScreen
+            users={appUsers}
+            currentUserId={user?.uid ?? ""}
+            onUpdateRole={handleUpdateUserRole}
+            onDeleteUser={async (id) => {
+              await handleDeleteUser(id);
+            }}
+            onTab={handleTab}
+            tab={tab}
+          />
+        )}
+
 
       {screen.name === "usuarios-list" && (
         <UsuariosListaScreen role={screen.role} users={appUsers} onDeleteUser={(id) => void handleDeleteUser(id)} onTab={handleTab} tab={tab} />

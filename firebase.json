@@ -1,7 +1,6 @@
 {
   "functions": [
     {
-      "source": "password-reset-functions", 
       "codebase": "default",
       "disallowLegacyRuntimeConfig": true,
       "ignore": [
@@ -9,6 +8,23 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log"
+      ],
+      "source": "password-reset-functions"
+    },
+    {
+      "source": "reports",
+      "codebase": "reports",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
       ]
     }
   ]

@@ -1,10 +1,25 @@
+
 import { useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
-import { collection, doc, getDoc, onSnapshot, orderBy, query } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  orderBy,
+  query,
+} from "firebase/firestore";
+
 import { auth, db, firebaseConfigured } from "@/lib/firebase";
-import type { AppUser, MaterialRequest, Report, Role, Screen } from "@/types";
+import type {
+  AppUser,
+  MaterialRequest,
+  Report,
+  Role,
+  Screen,
+} from "@/types";
 
 interface Setters {
   user: User | null;
@@ -18,95 +33,227 @@ interface Setters {
   onSessionRestored: (user: User, role: Role) => void;
 }
 
-/** Escucha en tiempo real a Firebase (sesión, usuarios, espacios, material y reportes). */
+/**
+ * Sincroniza los datos con Firebase.
+ * Las consultas se activan solamente cuando existe una sesión autenticada.
+ */
 export function useFirebaseSync({
-  user, setUser, setAuthLoading, setScreen, setAppUsers, setExtraSpaces, setMaterialRequests, setReports,
+  user,
+  setUser,
+  setAuthLoading,
+  setScreen,
+  setAppUsers,
+  setExtraSpaces,
+  setMaterialRequests,
+  setReports,
   onSessionRestored,
 }: Setters) {
-  // Guarda la última versión de la función para usarla dentro del listener de sesión
+  // Conserva la última versión de la función de recuperación de sesión.
   const restoreRef = useRef(onSessionRestored);
   restoreRef.current = onSessionRestored;
 
-  // Firebase Auth listener: si hay sesión guardada, restaura el rol y la pantalla
+  // Recupera la sesión y el rol del usuario.
   useEffect(() => {
     const a = auth;
+
     if (!firebaseConfigured || !a) {
       setAuthLoading(false);
       return;
     }
-    return onAuthStateChanged(a, async (u) => {
-      setUser(u);
 
-      if (!u) {
-        setAuthLoading(false);
-        setScreen({ name: "login" });
-        return;
-      }
+    return onAuthStateChanged(
+      a,
+      async (authenticatedUser) => {
+        console.log(
+          "Estado de autenticación:",
+          authenticatedUser ? "Sesión iniciada" : "Sin sesión"
+        );
 
-      try {
-        const d = db;
-        if (d) {
-          const snap = await getDoc(doc(d, "users", u.uid));
-          const role = snap.data()?.role;
-          if (role === "docente" || role === "tecnico" || role === "admin") {
-            restoreRef.current(u, role);
-          }
+        setUser(authenticatedUser);
+
+        if (!authenticatedUser) {
+          setAuthLoading(false);
+          setScreen({ name: "login" });
+          return;
         }
-      } catch (error) {
-        console.error("No se pudo restaurar la sesión:", error);
+
+        try {
+          const d = db;
+
+          if (d) {
+            const snap = await getDoc(
+              doc(d, "users", authenticatedUser.uid)
+            );
+
+            const role = snap.data()?.role;
+
+            if (
+              role === "docente" ||
+              role === "tecnico" ||
+              role === "admin"
+            ) {
+              restoreRef.current(authenticatedUser, role);
+            }
+          }
+        } catch (error) {
+          console.error("No se pudo restaurar la sesión:", error);
+        }
+
+        setAuthLoading(false);
+      },
+      (error) => {
+        console.error(
+          "Error de autenticación:",
+          error.code,
+          error.message
+        );
+        setAuthLoading(false);
       }
+    );
+  }, [setUser, setAuthLoading, setScreen]);
 
-      setAuthLoading(false);
-    });
-  }, []);
-
-  // Registered application users — used by the administrator directory
+  // Usuarios.
   useEffect(() => {
     const d = db;
+
     if (!firebaseConfigured || !d || !user) {
       setAppUsers([]);
       return;
     }
-    return onSnapshot(collection(d, "users"), (snap) => {
-      setAppUsers(snap.docs.map((userDoc) => ({ id: userDoc.id, ...userDoc.data() } as AppUser)));
-    });
-  }, [user]);
 
-  // Espacios agregados por el administrador
+    return onSnapshot(
+      collection(d, "users"),
+      (snap) => {
+        console.log("Usuarios recibidos de Firebase:", snap.size);
+
+        setAppUsers(
+          snap.docs.map(
+            (userDoc) =>
+              ({
+                id: userDoc.id,
+                ...userDoc.data(),
+              }) as AppUser
+          )
+        );
+      },
+      (error) => {
+        console.error(
+          "Error al cargar usuarios:",
+          error.code,
+          error.message
+        );
+      }
+    );
+  }, [user, setAppUsers]);
+
+  // Espacios.
   useEffect(() => {
     const d = db;
+
     if (!firebaseConfigured || !d || !user) {
       setExtraSpaces([]);
       return;
     }
-    return onSnapshot(collection(d, "spaces"), (snap) => {
-      setExtraSpaces(snap.docs.map((s) => s.data().name as string));
-    });
-  }, [user]);
 
-  // Material requests listener — used by the administrator dashboard
+    return onSnapshot(
+      collection(d, "spaces"),
+      (snap) => {
+        console.log("Espacios recibidos de Firebase:", snap.size);
+
+        setExtraSpaces(
+          snap.docs.map(
+            (spaceDoc) => spaceDoc.data().name as string
+          )
+        );
+      },
+      (error) => {
+        console.error(
+          "Error al cargar espacios:",
+          error.code,
+          error.message
+        );
+      }
+    );
+  }, [user, setExtraSpaces]);
+
+  // Solicitudes de material.
   useEffect(() => {
     const d = db;
+
     if (!firebaseConfigured || !d || !user) {
       setMaterialRequests([]);
       return;
     }
-    const q = query(collection(d, "materialRequests"), orderBy("createdAt", "desc"));
-    return onSnapshot(q, (snap) => {
-      setMaterialRequests(snap.docs.map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as MaterialRequest)));
-    });
-  }, [user]);
 
-  // Firestore real-time listener — only when configured
+    const q = query(
+      collection(d, "materialRequests"),
+      orderBy("createdAt", "desc")
+    );
+
+    return onSnapshot(
+      q,
+      (snap) => {
+        console.log(
+          "Solicitudes de material recibidas:",
+          snap.size
+        );
+
+        setMaterialRequests(
+          snap.docs.map(
+            (requestDoc) =>
+              ({
+                id: requestDoc.id,
+                ...requestDoc.data(),
+              }) as MaterialRequest
+          )
+        );
+      },
+      (error) => {
+        console.error(
+          "Error al cargar solicitudes de material:",
+          error.code,
+          error.message
+        );
+      }
+    );
+  }, [user, setMaterialRequests]);
+
+  // Reportes.
   useEffect(() => {
     const d = db;
+
     if (!firebaseConfigured || !d || !user) {
       setReports([]);
       return;
     }
-    const q = query(collection(d, "reports"), orderBy("createdAt", "desc"));
-    return onSnapshot(q, (snap) => {
-      setReports(snap.docs.map((reportDoc) => ({ id: reportDoc.id, ...reportDoc.data() } as Report)));
-    });
-  }, [user]);
+
+    const q = query(
+      collection(d, "reports"),
+      orderBy("createdAt", "desc")
+    );
+
+    return onSnapshot(
+      q,
+      (snap) => {
+        console.log("Reportes recibidos de Firebase:", snap.size);
+
+        setReports(
+          snap.docs.map(
+            (reportDoc) =>
+              ({
+                id: reportDoc.id,
+                ...reportDoc.data(),
+              }) as Report
+          )
+        );
+      },
+      (error) => {
+        console.error(
+          "Error al cargar reportes:",
+          error.code,
+          error.message
+        );
+      }
+    );
+  }, [user, setReports]);
 }

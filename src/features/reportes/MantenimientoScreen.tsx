@@ -12,13 +12,23 @@ export function MantenimientoScreen({
   reports: Report[]; onDetail: (id: string) => void; onTab: (t: Tab) => void; tab: Tab;
   readOnly?: boolean; title?: string; admin?: boolean;
 }) {
+
   const pending = reports
-  .filter((r) => r.status !== "Resuelto" && r.status !== "Cancelado")
-  .sort((a, b) => {
-    const porPrioridad = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
-    if (porPrioridad !== 0) return porPrioridad;
-    return (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0);
-  });
+    .filter((r) => r.status !== "Resuelto" && r.status !== "Cancelado")
+    .sort((a, b) => {
+      const porPrioridad = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+      if (porPrioridad !== 0) return porPrioridad;
+      return (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0);
+    });
+
+  console.log("Estados de reportes:", reports.map((r) => ({
+    id: r.id,
+    folio: r.folio,
+    status: r.status,
+  })));
+
+  console.log("Reportes pendientes:", pending.map((r) => r.folio));
+
   return (
     <>
       <NavHeader title={title} />
