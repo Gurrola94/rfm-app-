@@ -2,6 +2,8 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {initializeApp} from "firebase-admin/app";
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
+import {getMessaging} from "firebase-admin/messaging";
+import {onDocumentCreated} from "firebase-functions/v2/firestore";
 
 // Inicializar Firebase Admin.
 initializeApp();
@@ -137,5 +139,60 @@ export const crearReporte = onCall(
       folio,
       reportId: reportRef.id,
     };
+  }
+);
+
+// Avisa a técnicos y administradores cuando se crea un reporte nuevo.
+export const avisoNuevoReporte = onDocumentCreated(
+  {document: "reports/{reportId}", region: "us-central1"},
+  async (event) => {
+    const reporte = event.data?.data();
+    if (!reporte) return;
+
+    // Correos de los técnicos y administradores registrados.
+    const usuarios = await db
+      .collection("users")
+      .where("role", "in", ["tecnico", "admin"])
+      .get();
+    const correos = new Set(
+      usuarios.docs
+        .map((d) => String(d.data().email ?? "").toLowerCase())
+        .filter(Boolean)
+    );
+    if (correos.size === 0) return;
+
+    // Tokens de los celulares registrados por esos usuarios.
+    const tokensSnap = await db.collection("fcmTokens").get();
+    const destinos = tokensSnap.docs.filter((d) =>
+      correos.has(String(d.data().email ?? "").toLowerCase())
+    );
+    const tokens = destinos
+      .map((d) => d.data().token as string)
+      .filter(Boolean);
+    if (tokens.length === 0) return;
+
+    const folio = reporte.folio ? ` #${reporte.folio}` : "";
+    const respuesta = await getMessaging().sendEachForMulticast({
+      tokens: destinos.map((d) => d.data().token as string),
+      notification: {
+        title: `Nuevo reporte${folio}`,
+        body: `${reporte.salon} · ${reporte.category} · ${reporte.priority}`,
+      },
+      data: {reportId: event.params.reportId},
+      android: {priority: "high"},
+    });
+
+    // Elimina los tokens que ya no son válidos (app desinstalada, etc.).
+    const borrados: Promise<unknown>[] = [];
+    respuesta.responses.forEach((r, i) => {
+      const codigo = r.error?.code ?? "";
+      if (
+        codigo === "messaging/registration-token-not-registered" ||
+        codigo === "messaging/invalid-registration-token"
+      ) {
+        borrados.push(destinos[i].ref.delete());
+      }
+    });
+    await Promise.all(borrados);
   }
 );
