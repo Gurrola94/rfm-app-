@@ -37,7 +37,6 @@ export interface Report {
   evidenciaNombre?: string;
   horarioInicio?: string;
   horarioFin?: string;
-  foto?: string;
   fotoResuelto?: string;
   avances?: Avance[];
 }
