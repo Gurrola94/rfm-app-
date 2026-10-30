@@ -1,10 +1,12 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
 import {
   collection,
+  doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -15,6 +17,7 @@ import type {
   AppUser,
   MaterialRequest,
   Report,
+  Role,
   Screen,
 } from "@/types";
 
@@ -27,6 +30,7 @@ interface Setters {
   setExtraSpaces: Dispatch<SetStateAction<string[]>>;
   setMaterialRequests: Dispatch<SetStateAction<MaterialRequest[]>>;
   setReports: Dispatch<SetStateAction<Report[]>>;
+  onSessionRestored: (user: User, role: Role) => void;
 }
 
 /**
@@ -42,8 +46,13 @@ export function useFirebaseSync({
   setExtraSpaces,
   setMaterialRequests,
   setReports,
+  onSessionRestored,
 }: Setters) {
-  // Primero, Firebase determina si existe una sesión iniciada.
+  // Conserva la última versión de la función de recuperación de sesión.
+  const restoreRef = useRef(onSessionRestored);
+  restoreRef.current = onSessionRestored;
+
+  // Recupera la sesión y el rol del usuario.
   useEffect(() => {
     const a = auth;
 
@@ -54,18 +63,43 @@ export function useFirebaseSync({
 
     return onAuthStateChanged(
       a,
-      (authenticatedUser) => {
+      async (authenticatedUser) => {
         console.log(
           "Estado de autenticación:",
           authenticatedUser ? "Sesión iniciada" : "Sin sesión"
         );
 
         setUser(authenticatedUser);
-        setAuthLoading(false);
 
         if (!authenticatedUser) {
+          setAuthLoading(false);
           setScreen({ name: "login" });
+          return;
         }
+
+        try {
+          const d = db;
+
+          if (d) {
+            const snap = await getDoc(
+              doc(d, "users", authenticatedUser.uid)
+            );
+
+            const role = snap.data()?.role;
+
+            if (
+              role === "docente" ||
+              role === "tecnico" ||
+              role === "admin"
+            ) {
+              restoreRef.current(authenticatedUser, role);
+            }
+          }
+        } catch (error) {
+          console.error("No se pudo restaurar la sesión:", error);
+        }
+
+        setAuthLoading(false);
       },
       (error) => {
         console.error(

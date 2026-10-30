@@ -4,22 +4,30 @@ import { CAT_ICON, PRIORITY_BADGE, PRIORITY_DOT, PRIORITY_LABELS, STATUS_BADGE }
 import type { Report, Tab } from "@/types";
 import { formatDateTime } from "@/utils/format";
 
+const PRIORITY_ORDER: Record<string, number> = { Urgente: 0, Media: 1, Baja: 2 };
+
 export function MantenimientoScreen({
   reports, onDetail, onTab, tab, readOnly = false, title = "Mantenimiento", admin = false,
 }: {
   reports: Report[]; onDetail: (id: string) => void; onTab: (t: Tab) => void; tab: Tab;
   readOnly?: boolean; title?: string; admin?: boolean;
 }) {
-  const pending = reports.filter((r) => r.status !== "Resuelto" && r.status !== "Cancelado");
 
+  const pending = reports
+    .filter((r) => r.status !== "Resuelto" && r.status !== "Cancelado")
+    .sort((a, b) => {
+      const porPrioridad = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+      if (porPrioridad !== 0) return porPrioridad;
+      return (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0);
+    });
 
   console.log("Estados de reportes:", reports.map((r) => ({
-  id: r.id,
-  folio: r.folio,
-  status: r.status,
-})));
+    id: r.id,
+    folio: r.folio,
+    status: r.status,
+  })));
 
-console.log("Reportes pendientes:", pending.map((r) => r.folio));
+  console.log("Reportes pendientes:", pending.map((r) => r.folio));
 
   return (
     <>
@@ -58,7 +66,7 @@ console.log("Reportes pendientes:", pending.map((r) => r.folio));
             </div>
           ))}
           {pending.length === 0 && (
-            <div className="text-center py-14 text-gray-400 text-sm">Sin reportes pendientes 🎉</div>
+            <div className="text-center py-14 text-gray-400 text-sm">Sin reportes pendientes </div>
           )}
         </div>
       </div>
