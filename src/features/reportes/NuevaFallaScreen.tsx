@@ -11,7 +11,6 @@ import { db } from "@/lib/firebase";
 import { NavHeader } from "@/components/layout/NavHeader";
 import { CATEGORIES, PRIORITY_LABELS } from "@/constants";
 import type { Category, Priority, Report, Role } from "@/types";
-import { takePhoto } from "@/utils/image";
 
 export function NuevaFallaScreen({
   user,
@@ -45,7 +44,6 @@ export function NuevaFallaScreen({
   );
   const [horarioInicio, setHorarioInicio] = useState("");
   const [horarioFin, setHorarioFin] = useState("");
-  const [foto, setFoto] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -94,7 +92,6 @@ export function NuevaFallaScreen({
           description,
           horarioInicio,
           horarioFin,
-          ...(foto ? { foto } : {}),
           status: "Pendiente",
           reportedBy,
           reportedByUid: user.uid || "demo",
@@ -135,7 +132,6 @@ export function NuevaFallaScreen({
         description: description.trim(),
         horarioInicio,
         horarioFin,
-        ...(foto ? { foto } : {}),
         status: "Pendiente",
         reportedBy,
         reportedByUid: user.uid,
@@ -160,17 +156,6 @@ export function NuevaFallaScreen({
       alert(`No se pudo enviar el reporte: ${mensaje}`);
     } finally {
       setSending(false);
-    }
-  }
-
-  // Abre la cámara (o la galería) para adjuntar una foto al reporte.
-  async function handleTomarFoto() {
-    try {
-      const f = await takePhoto("prompt");
-      if (f) setFoto(f);
-    } catch (err) {
-      console.error(err);
-      alert("No se pudo abrir la cámara.");
     }
   }
 
@@ -347,12 +332,10 @@ export function NuevaFallaScreen({
 
               <button
                 type="button"
-                onClick={() => void handleTomarFoto()}
                 className="bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-slate-200 transition"
               >
-                {foto ? "Foto lista · toca para cambiarla" : "+ Tomar foto"}
+                + Tomar foto
               </button>
-              {foto && <img src={foto} alt="Foto del reporte" className="mt-2 h-24 w-24 rounded-xl object-cover" />}
             </div>
           </div>
         </div>
