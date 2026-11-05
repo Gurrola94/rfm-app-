@@ -58,4 +58,5 @@ export interface AppUser {
   email: string;
   role: "tecnico" | "docente" | "admin";
   temporaryPassword?: string;
+  createdAt?: Timestamp | null;
 }

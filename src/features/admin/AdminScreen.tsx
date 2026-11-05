@@ -6,7 +6,7 @@ import type { Category, MaterialRequest, Report, Tab } from "@/types";
 import { timeAgo } from "@/utils/format";
 
 export function AdminScreen({
-  reports, requests, onTab, tab, onOpenFailures, onOpenMaterials, onOpenApoyos, onOpenReport, onNewReport, onCancelReport, onAddSpace, spaces,
+  reports, requests, onTab, tab, onOpenFailures, onOpenMaterials, onOpenApoyos, onOpenReport, onViewAllIncoming, onNewReport, onCancelReport, onAddSpace, spaces,
 }: {
   reports: Report[];
   requests: MaterialRequest[];
@@ -16,13 +16,17 @@ export function AdminScreen({
   onOpenMaterials: () => void;
   onOpenApoyos: () => void;
   onOpenReport: (id: string) => void;
+  onViewAllIncoming: () => void;
   onNewReport: (cat?: Category) => void;
   onCancelReport: (id: string) => void;
   onAddSpace: (name: string) => void;
   spaces: string[];
 }) {
   const [newSpace, setNewSpace] = useState("");
-  const incomingReports = reports.filter((r) => r.role !== "admin" && r.status !== "Resuelto" && r.status !== "Cancelado").slice(0, 5);
+  const allIncomingReports = reports
+    .filter((r) => r.role !== "admin" && r.status !== "Resuelto" && r.status !== "Cancelado")
+    .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+  const incomingReports = allIncomingReports.slice(0, 3);
   const activeFailures = reports.filter((report) => report.status !== "Resuelto" && report.status !== "Cancelado").length;
   const pendingRequests = requests.filter((request) => request.status === "Pendiente de aprobación" && request.tipo !== "apoyo_externo");
   const pendingApoyos = requests.filter((request) => request.status === "Pendiente de aprobación" && request.tipo === "apoyo_externo");
@@ -71,6 +75,15 @@ export function AdminScreen({
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-none ${STATUS_BADGE[r.status]}`}>{r.status}</span>
                   </button>
                 ))}
+                {allIncomingReports.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={onViewAllIncoming}
+                    className="w-full rounded-full border border-[#17c3ce] bg-[#17c3ce]/10 py-2.5 text-xs font-extrabold text-[#0e1f4d] transition hover:bg-[#17c3ce]/20"
+                  >
+                    Ver más
+                  </button>
+                )}
               </div>
             )}
           </section>

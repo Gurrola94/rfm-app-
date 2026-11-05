@@ -1,4 +1,4 @@
-import type { Category } from "./models";
+import type { Category, Role } from "./models";
 
 export type Screen =
   | { name: "login" }
@@ -14,4 +14,4 @@ export type Screen =
   | { name: "admin-apoyos" }
   | { name: "admin-materiales-historial" }
   | { name: "usuarios" }
-  | { name: "usuarios-list"; role: "tecnico" | "docente" | "all" };
+  | { name: "usuarios-list"; role: Role | "all" };

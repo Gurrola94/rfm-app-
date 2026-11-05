@@ -138,6 +138,10 @@ export default function App() {
     setTab("home");
   }
 
+  function handleOpenUsersList(listRole: "all" | Role) {
+    setScreen({ name: "usuarios-list", role: listRole });
+  }
+
   function handleTab(t: Tab) {
     setTab(t);
     if (t === "home") setScreen(role === "tecnico" ? { name: "mantenimiento" } : role === "admin" ? { name: "admin" } : { name: "home" });
@@ -288,6 +292,7 @@ export default function App() {
             onDeleteUser={async (id) => {
               await handleDeleteUser(id);
             }}
+            onOpenList={handleOpenUsersList}
             onTab={handleTab}
             tab={tab}
           />
@@ -309,6 +314,7 @@ export default function App() {
           onTab={handleTab}
           tab={tab}
           onOpenFailures={() => setScreen({ name: "admin-fallas" })}
+          onViewAllIncoming={() => handleTab("reportes")}
           onOpenMaterials={() => setScreen({ name: "admin-materiales" })}
           onOpenApoyos={() => setScreen({ name: "admin-apoyos" })}
           onOpenReport={(id) => setScreen({ name: "detalle", reportId: id, returnTo: "admin" })}

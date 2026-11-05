@@ -9,6 +9,7 @@ export function UsuariosScreen({
   currentUserId,
   onUpdateRole,
   onDeleteUser,
+  onOpenList,
   onTab,
   tab,
 }: {
@@ -16,6 +17,7 @@ export function UsuariosScreen({
   currentUserId: string;
   onUpdateRole: (id: string, role: Role) => Promise<void>;
   onDeleteUser: (id: string) => Promise<void>;
+  onOpenList: (role: "all" | Role) => void;
   onTab: (t: Tab) => void;
   tab: Tab;
 }) {
@@ -24,6 +26,7 @@ export function UsuariosScreen({
   >("total");
 
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
+  const [openOptionsUserId, setOpenOptionsUserId] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role>("docente");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -64,6 +67,7 @@ export function UsuariosScreen({
     selectedMetric === "total"
       ? users
       : users.filter((user) => user.role === selectedMetric);
+  const previewUsers = visibleUsers.slice(0, 3);
 
   function openEditor(appUser: AppUser) {
     setEditingUser(appUser);
@@ -178,7 +182,7 @@ export function UsuariosScreen({
           </div>
 
           <div className="space-y-2">
-            {visibleUsers.map((appUser) => (
+            {(visibleUsers.length > 3 ? previewUsers : visibleUsers).map((appUser) => (
               <div
                 key={appUser.id}
                 className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"
@@ -202,24 +206,56 @@ export function UsuariosScreen({
                 </div>
 
                 {appUser.id !== currentUserId && (
-                  <div className="flex shrink-0 flex-col gap-1.5">
+                  <div className="relative shrink-0">
                     <button
                       type="button"
-                      onClick={() => openEditor(appUser)}
+                      onClick={() =>
+                        setOpenOptionsUserId((current) =>
+                          current === appUser.id ? null : appUser.id,
+                        )
+                      }
+                      aria-label={`Opciones de ${appUser.email}`}
+                      aria-haspopup="menu"
+                      aria-expanded={openOptionsUserId === appUser.id}
                       disabled={deletingId !== null || saving}
-                      className="rounded-lg bg-[#0e1f4d] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#172b62] disabled:opacity-50"
+                      className="rounded-lg px-2 py-1 text-xl leading-none text-slate-500 transition hover:bg-slate-200 hover:text-[#0e1f4d] disabled:opacity-50"
                     >
-                      Editar
+                      ⋮
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => void deleteUser(appUser)}
-                      disabled={deletingId !== null || saving}
-                      className="rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
-                    >
-                      {deletingId === appUser.id ? "Eliminando..." : "Eliminar"}
-                    </button>
+                    {openOptionsUserId === appUser.id && (
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-full z-10 mt-1 min-w-32 rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setOpenOptionsUserId(null);
+                            openEditor(appUser);
+                          }}
+                          disabled={deletingId !== null || saving}
+                          className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-[#0e1f4d] transition hover:bg-slate-100 disabled:opacity-50"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setOpenOptionsUserId(null);
+                            void deleteUser(appUser);
+                          }}
+                          disabled={deletingId !== null || saving}
+                          className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {deletingId === appUser.id
+                            ? "Eliminando..."
+                            : "Eliminar"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -231,6 +267,16 @@ export function UsuariosScreen({
               </p>
             )}
           </div>
+
+          {visibleUsers.length > 3 && (
+            <button
+              type="button"
+              onClick={() => onOpenList(selectedMetric === "total" ? "all" : selectedMetric)}
+              className="mt-4 w-full rounded-full border border-[#17c3ce] bg-[#17c3ce]/10 py-3 text-sm font-extrabold text-[#0e1f4d] transition hover:bg-[#17c3ce]/20"
+            >
+              Ver más
+            </button>
+          )}
         </div>
 
         {error && !editingUser && (
