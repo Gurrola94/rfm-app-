@@ -2,20 +2,26 @@ import { useState } from "react";
 import { NavHeader } from "@/components/layout/NavHeader";
 import { TabBar } from "@/components/layout/TabBar";
 import { UserList } from "@/features/usuarios/components/UserList";
-import type { AppUser, Tab } from "@/types";
+import type { AppUser, Role, Tab } from "@/types";
 
 type UserSort = "newest" | "oldest" | "alphabetical";
 
-export function UsuariosListaScreen({ role, users, onDeleteUser, onTab, tab }: {
+export function UsuariosListaScreen({ role, users, currentUserId, onDeleteUser, onUpdateUserRole, onTab, tab }: {
   role: "tecnico" | "docente" | "admin" | "all";
   users: AppUser[];
-  onDeleteUser: (id: string) => void;
+  currentUserId: string;
+  onDeleteUser: (id: string) => Promise<void>;
+  onUpdateUserRole: (id: string, role: Role) => Promise<void>;
   onTab: (t: Tab) => void;
   tab: Tab;
 }) {
   const [searchText, setSearchText] = useState("");
   const [sortBy, setSortBy] = useState<UserSort>("newest");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<AppUser | null>(null);
+  const [selectedRole, setSelectedRole] = useState<Role>("docente");
+  const [savingRole, setSavingRole] = useState(false);
+  const [editError, setEditError] = useState("");
   const label = role === "all" ? "Todos los usuarios" : role === "tecnico" ? "Técnicos" : role === "admin" ? "Administradores" : "Docentes";
   const roleUsers = role === "all" ? users : users.filter((user) => user.role === role);
   const normalizedSearch = searchText.trim().toLocaleLowerCase("es-MX");
@@ -37,6 +43,29 @@ export function UsuariosListaScreen({ role, users, onDeleteUser, onTab, tab }: {
         ? bCreatedAt - aCreatedAt
         : aCreatedAt - bCreatedAt;
     });
+
+  function openEditor(appUser: AppUser) {
+    setEditingUser(appUser);
+    setSelectedRole(appUser.role);
+    setEditError("");
+  }
+
+  async function saveRole() {
+    if (!editingUser || savingRole) return;
+    setSavingRole(true);
+    setEditError("");
+    try {
+      await onUpdateUserRole(editingUser.id, selectedRole);
+      setEditingUser(null);
+    } catch (error) {
+      console.error("Error al actualizar el rol:", error);
+      setEditError(
+        "No se pudo actualizar el rol. Verifica los permisos e inténtalo nuevamente.",
+      );
+    } finally {
+      setSavingRole(false);
+    }
+  }
 
   return (
     <>
@@ -121,7 +150,12 @@ export function UsuariosListaScreen({ role, users, onDeleteUser, onTab, tab }: {
           </div>
         </div>
         {visibleUsers.length > 0 ? (
-          <UserList users={visibleUsers} onDeleteUser={onDeleteUser} />
+          <UserList
+            users={visibleUsers}
+            currentUserId={currentUserId}
+            onEditUser={openEditor}
+            onDeleteUser={onDeleteUser}
+          />
         ) : (
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-xs text-slate-400">
             {normalizedSearch
@@ -131,6 +165,76 @@ export function UsuariosListaScreen({ role, users, onDeleteUser, onTab, tab }: {
         )}
       </div>
       <TabBar active="usuarios" onChange={onTab} admin />
+
+      {editingUser && (
+        <div className="absolute inset-0 z-20 flex items-end bg-[#0e1f4d]/40 p-3 sm:items-center sm:justify-center">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-user-title"
+            className="w-full space-y-4 rounded-[26px] bg-white p-5 shadow-xl sm:max-w-md"
+          >
+            <div>
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#17c3ce]">
+                Administración de usuarios
+              </p>
+              <h2
+                id="edit-user-title"
+                className="mt-1 text-lg font-extrabold text-[#0e1f4d]"
+              >
+                Editar rol
+              </h2>
+              <p className="mt-2 break-words text-sm text-slate-600">
+                {editingUser.email}
+              </p>
+            </div>
+
+            <label
+              htmlFor="full-list-user-role"
+              className="block text-xs font-bold text-slate-600"
+            >
+              Selecciona el nuevo rol
+            </label>
+            <select
+              id="full-list-user-role"
+              value={selectedRole}
+              onChange={(event) => setSelectedRole(event.target.value as Role)}
+              disabled={savingRole}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-[#0e1f4d] focus:border-[#17c3ce] focus:outline-none"
+            >
+              <option value="docente">Docente</option>
+              <option value="tecnico">Técnico</option>
+              <option value="admin">Administrador</option>
+            </select>
+
+            {editError && (
+              <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                {editError}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => void saveRole()}
+              disabled={savingRole}
+              className="w-full rounded-full bg-[#17c3ce] py-3 text-sm font-extrabold text-white transition hover:bg-[#12a8b3] disabled:opacity-50"
+            >
+              {savingRole ? "Guardando..." : "Guardar cambios"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingUser(null);
+                setEditError("");
+              }}
+              disabled={savingRole}
+              className="w-full rounded-full border border-slate-200 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

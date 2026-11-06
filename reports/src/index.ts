@@ -47,8 +47,6 @@ export const crearReporte = onCall(
       salon,
       elemento,
       description,
-      horarioInicio,
-      horarioFin,
     } = data;
 
     // Validar que los campos obligatorios sean textos no vacíos.
@@ -58,8 +56,6 @@ export const crearReporte = onCall(
       salon,
       elemento,
       description,
-      horarioInicio,
-      horarioFin,
     };
 
     for (const [campo, valor] of Object.entries(camposTexto)) {
@@ -113,8 +109,6 @@ export const crearReporte = onCall(
         salon: salon.trim(),
         elemento: elemento.trim(),
         description: description.trim(),
-        horarioInicio,
-        horarioFin,
         status: "Pendiente",
 
         // Obtener el nombre o correo del usuario autenticado.

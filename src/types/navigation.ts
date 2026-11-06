@@ -13,5 +13,7 @@ export type Screen =
   | { name: "admin-materiales" }
   | { name: "admin-apoyos" }
   | { name: "admin-materiales-historial" }
+  | { name: "gestion" }
   | { name: "usuarios" }
+  | { name: "espacios" }
   | { name: "usuarios-list"; role: Role | "all" };

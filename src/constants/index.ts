@@ -24,10 +24,10 @@ export const STATUS_BADGE: Record<Status, string> = {
 export const CAT_ICON: Record<Category, string> = {
   "Minisplit/Clima": "❄️",
   "Chapas/Puertas": "🚪",
-  Eléctrico: "💡",
-  Mobiliario: "🪑",
-  Plomería: "🔧",
-  Tecnología: "💻",
+  "Eléctrico": "💡",
+  "Mobiliario": "🪑",
+  "Plomería": "🔧",
+  "Tecnología": "💻",
 };
 export const CATEGORIES: Category[] = ["Minisplit/Clima", "Chapas/Puertas", "Eléctrico", "Mobiliario", "Plomería", "Tecnología"];
 export const PRIORITIES: Priority[] = ["Urgente", "Media", "Baja"];

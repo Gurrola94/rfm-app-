@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { signOut, User } from "firebase/auth";
-import { collection, addDoc, doc, updateDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, serverTimestamp, deleteDoc, setDoc } from "firebase/firestore";
 import { auth, db, firebaseConfigured } from "@/lib/firebase";
 import logoRfm from "@/assets/logo_buhsab.png";
 import { Shell } from "@/components/layout/Shell";
@@ -16,12 +16,13 @@ import { MantenimientoScreen } from "@/features/reportes/MantenimientoScreen";
 import { NuevaFallaScreen } from "@/features/reportes/NuevaFallaScreen";
 import { AdminMaterialHistoryScreen } from "@/features/material/AdminMaterialHistoryScreen";
 import { AdminMaterialScreen } from "@/features/material/AdminMaterialScreen";
+import { EspaciosScreen, GestionScreen } from "@/features/admin/GestionScreen";
 import { UsuariosListaScreen } from "@/features/usuarios/UsuariosListaScreen";
 import { UsuariosScreen } from "@/features/usuarios/UsuariosScreen";
 import { AdminScreen } from "@/features/admin/AdminScreen";
 import { useFirebaseSync } from "@/hooks/useFirebaseSync";
 import { useAndroidBackButton, useStatusBarStyle } from "@/hooks/useNative";
-import type { AppUser, Category, MaterialRequest, Report, Role, Screen, Tab } from "@/types";
+import type { AppSpace, AppUser, Category, MaterialRequest, Report, Role, Screen, Tab } from "@/types";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -33,7 +34,7 @@ export default function App() {
   const [reports, setReports] = useState<Report[]>(firebaseConfigured ? [] : DEMO_REPORTS);
   const [materialRequests, setMaterialRequests] = useState<MaterialRequest[]>(firebaseConfigured ? [] : DEMO_MATERIAL_REQUESTS);
   const [appUsers, setAppUsers] = useState<AppUser[]>(firebaseConfigured ? [] : DEMO_USERS);
-  const [extraSpaces, setExtraSpaces] = useState<string[]>([]);
+  const [storedSpaces, setStoredSpaces] = useState<AppSpace[]>([]);
   const [sessionName, setSessionName] = useState("");
   // Demo mode user substitute
   const [demoUser] = useState({ uid: "demo-uid", email: "demo@buhsab.mx", displayName: "Demo" });
@@ -42,10 +43,12 @@ export default function App() {
   useFirebaseSync({
     user,
     setUser,
+    role,
+    setRole,
     setAuthLoading,
     setScreen,
     setAppUsers,
-    setExtraSpaces,
+    setSpaces: setStoredSpaces,
     setMaterialRequests,
     setReports,
     onSessionRestored: (u, r) => handleLogin(u, r),
@@ -56,6 +59,29 @@ export default function App() {
 
 
   const effectiveUser = firebaseConfigured ? user : (demoUser as unknown as User);
+  const baseSpaceOverrides = storedSpaces.filter(
+    (space) => space.isDefault && space.baseName,
+  );
+  const spaces: AppSpace[] = [
+    ...AREAS.flatMap((baseName) => {
+      const override = baseSpaceOverrides.find(
+        (space) => space.baseName === baseName,
+      );
+      if (override?.deleted) return [];
+      return [{
+        id: override?.id ?? `base:${baseName}`,
+        name: override?.name ?? baseName,
+        createdAt: override?.createdAt ?? null,
+        isDefault: true,
+        baseName,
+      }];
+    }),
+    ...storedSpaces.filter((space) => !space.isDefault && !space.deleted),
+  ];
+
+  function getBaseSpaceDocumentId(baseName: string) {
+    return `__default__${encodeURIComponent(baseName)}`;
+  }
 
   function handleLogin(u: User | null, r: Role, email?: string) {
     setUser(u);
@@ -66,12 +92,132 @@ export default function App() {
   }
 
   async function handleAddSpace(name: string) {
-    const clean = name.trim();
-    if (!clean || [...AREAS, ...extraSpaces].includes(clean)) return;
-    if (firebaseConfigured && db) {
-      await addDoc(collection(db, "spaces"), { name: clean, createdAt: serverTimestamp() });
+    const cleanName = name.trim();
+    if (!cleanName) {
+      throw new Error("El nombre del espacio es obligatorio.");
+    }
+    if (spaces.some((space) => space.name.toLocaleLowerCase("es-MX") === cleanName.toLocaleLowerCase("es-MX"))) {
+      throw new Error("El espacio ya está registrado.");
+    }
+
+    if (firebaseConfigured) {
+      if (!db) {
+        throw new Error("Firestore no está disponible.");
+      }
+      await addDoc(collection(db, "spaces"), {
+        name: cleanName,
+        createdAt: serverTimestamp(),
+      });
+      return;
+    }
+
+    setStoredSpaces((current) => [
+      ...current,
+      { id: `demo-space-${Date.now()}`, name: cleanName, createdAt: null },
+    ]);
+  }
+
+  async function handleUpdateSpace(space: AppSpace, name: string) {
+    const cleanName = name.trim();
+    if (!cleanName) throw new Error("El nombre del espacio es obligatorio.");
+    if (
+      spaces.some(
+        (existing) =>
+          existing.id !== space.id &&
+          existing.name.toLocaleLowerCase("es-MX") === cleanName.toLocaleLowerCase("es-MX"),
+      )
+    ) {
+      throw new Error("El espacio ya está registrado.");
+    }
+
+    if (space.isDefault) {
+      const baseName = space.baseName;
+      if (!baseName) throw new Error("No se encontró el espacio base.");
+      const id = space.id.startsWith("base:")
+        ? getBaseSpaceDocumentId(baseName)
+        : space.id;
+      const updatedSpace: AppSpace = {
+        id,
+        name: cleanName,
+        createdAt: space.createdAt ?? null,
+        isDefault: true,
+        baseName,
+      };
+      if (firebaseConfigured) {
+        if (!db) throw new Error("Firestore no está disponible.");
+        await setDoc(
+          doc(db, "spaces", id),
+          {
+            name: cleanName,
+            baseName,
+            isDefault: true,
+            deleted: false,
+            createdAt: space.createdAt ?? serverTimestamp(),
+          },
+          { merge: true },
+        );
+      } else {
+        setStoredSpaces((current) => [
+          ...current.filter((stored) => stored.baseName !== baseName),
+          updatedSpace,
+        ]);
+      }
+      return;
+    }
+
+    if (firebaseConfigured) {
+      if (!db) throw new Error("Firestore no está disponible.");
+      await updateDoc(doc(db, "spaces", space.id), { name: cleanName });
     } else {
-      setExtraSpaces((current) => [...current, clean]);
+      setStoredSpaces((current) =>
+        current.map((stored) =>
+          stored.id === space.id ? { ...stored, name: cleanName } : stored,
+        ),
+      );
+    }
+  }
+
+  async function handleDeleteSpace(space: AppSpace) {
+    if (space.isDefault) {
+      const baseName = space.baseName;
+      if (!baseName) throw new Error("No se encontró el espacio base.");
+      const id = space.id.startsWith("base:")
+        ? getBaseSpaceDocumentId(baseName)
+        : space.id;
+      if (firebaseConfigured) {
+        if (!db) throw new Error("Firestore no está disponible.");
+        await setDoc(
+          doc(db, "spaces", id),
+          {
+            name: space.name,
+            baseName,
+            isDefault: true,
+            deleted: true,
+            createdAt: space.createdAt ?? serverTimestamp(),
+          },
+          { merge: true },
+        );
+      } else {
+        setStoredSpaces((current) => [
+          ...current.filter((stored) => stored.baseName !== baseName),
+          {
+            ...space,
+            id,
+            isDefault: true,
+            deleted: true,
+          },
+        ]);
+      }
+      return;
+    }
+
+    if (firebaseConfigured) {
+      if (!db) throw new Error("Firestore no está disponible.");
+      await deleteDoc(doc(db, "spaces", space.id));
+    } else {
+      setStoredSpaces((current) =>
+        current.filter((stored) => stored.id !== space.id),
+      );
     }
   }
 
@@ -125,10 +271,29 @@ export default function App() {
   }
 
   async function handleCancelReportByTeacher(id: string) {
-    if (firebaseConfigured && db) {
+    const report = reports.find((current) => current.id === id);
+    if (
+      role !== "docente" ||
+      !effectiveUser ||
+      !report ||
+      report.reportedByUid !== effectiveUser.uid ||
+      report.status === "Resuelto" ||
+      report.status === "Cancelado"
+    ) {
+      throw new Error("No tienes permiso para cancelar este reporte.");
+    }
+
+    if (firebaseConfigured) {
+      if (!db) throw new Error("Firestore no está disponible.");
       await updateDoc(doc(db, "reports", id), { status: "Cancelado" });
     }
-    setReports((current) => current.map((report) => report.id === id ? { ...report, status: "Cancelado" } : report));
+    setReports((current) =>
+      current.map((currentReport) =>
+        currentReport.id === id
+          ? { ...currentReport, status: "Cancelado" }
+          : currentReport,
+      ),
+    );
   }
 
   async function handleLogout() {
@@ -145,7 +310,7 @@ export default function App() {
   function handleTab(t: Tab) {
     setTab(t);
     if (t === "home") setScreen(role === "tecnico" ? { name: "mantenimiento" } : role === "admin" ? { name: "admin" } : { name: "home" });
-    else if (t === "usuarios" && role === "admin") setScreen({ name: "usuarios" });
+    else if (t === "usuarios" && role === "admin") setScreen({ name: "gestion" });
     else if (t === "reportes") setScreen({ name: "historial" });
     else if (t === "perfil") setScreen({ name: "perfil" });
   }
@@ -169,9 +334,13 @@ export default function App() {
       case "usuarios-list":
         setScreen({ name: "usuarios" });
         return true;
+      case "usuarios":
+        setScreen({ name: "gestion" });
+        return true;
+      case "gestion":
+      case "espacios":
       case "historial":
       case "perfil":
-      case "usuarios":
         handleTab("home");
         return true;
       default:
@@ -181,9 +350,13 @@ export default function App() {
 
   // Siguiente folio consecutivo (solo se usa en modo demo)
   const nextFolio = String(reports.reduce((max, r) => Math.max(max, Number(r.folio) || 0), 0) + 1);
+  const roleVisibleReports =
+    role === "docente" && effectiveUser
+      ? reports.filter((report) => report.reportedByUid === effectiveUser.uid)
+      : reports;
 
   const selectedReport = screen.name === "detalle"
-    ? reports.find((r) => r.id === (screen as { name: "detalle"; reportId: string }).reportId)
+    ? roleVisibleReports.find((r) => r.id === (screen as { name: "detalle"; reportId: string }).reportId)
     : undefined;
 
   if (showSplash) {
@@ -219,7 +392,7 @@ export default function App() {
 
       {screen.name === "home" && effectiveUser && (
         <HomeScreen
-          user={effectiveUser} role={role} reports={reports}
+          user={effectiveUser} role={role} reports={roleVisibleReports}
           onNewReport={(cat) => setScreen({ name: "nueva", preCategory: cat })}
           onCancelReport={role === "docente" ? handleCancelReportByTeacher : undefined}
           onTab={handleTab} tab={tab}
@@ -233,7 +406,7 @@ export default function App() {
           onBack={() => setScreen((screen as { name: "nueva"; returnTo?: "home" | "admin" }).returnTo === "admin" ? { name: "admin" } : { name: "home" })}
           demoMode={!firebaseConfigured}
           onDemoAdd={(r) => setReports((prev) => [r, ...prev])}
-          areas={[...AREAS, ...extraSpaces]}
+          areas={spaces.map((space) => space.name)}
           nextFolio={nextFolio}
         />
       )}
@@ -280,9 +453,17 @@ export default function App() {
       )}
 
       {screen.name === "historial" && (
-        <HistorialScreen reports={reports} materialRequests={materialRequests} role={role} onDetail={(id) => setScreen({ name: "detalle", reportId: id, returnTo: "historial" })} onTab={handleTab} tab={tab} />
+        <HistorialScreen reports={roleVisibleReports} materialRequests={materialRequests} role={role} onDetail={(id) => setScreen({ name: "detalle", reportId: id, returnTo: "historial" })} onCancelReport={role === "docente" ? handleCancelReportByTeacher : undefined} onTab={handleTab} tab={tab} />
       )}
 
+      {screen.name === "gestion" && (
+        <GestionScreen
+          onOpenUsers={() => setScreen({ name: "usuarios" })}
+          onOpenSpaces={() => setScreen({ name: "espacios" })}
+          onTab={handleTab}
+          tab={tab}
+        />
+      )}
 
         {screen.name === "usuarios" && (
           <UsuariosScreen
@@ -293,14 +474,35 @@ export default function App() {
               await handleDeleteUser(id);
             }}
             onOpenList={handleOpenUsersList}
+            onBack={() => setScreen({ name: "gestion" })}
             onTab={handleTab}
             tab={tab}
           />
         )}
 
+      {screen.name === "espacios" && (
+        <EspaciosScreen
+          spaces={spaces}
+          onAddSpace={handleAddSpace}
+          onUpdateSpace={handleUpdateSpace}
+          onDeleteSpace={handleDeleteSpace}
+          onBack={() => setScreen({ name: "gestion" })}
+          onTab={handleTab}
+          tab={tab}
+        />
+      )}
+
 
       {screen.name === "usuarios-list" && (
-        <UsuariosListaScreen role={screen.role} users={appUsers} onDeleteUser={(id) => void handleDeleteUser(id)} onTab={handleTab} tab={tab} />
+        <UsuariosListaScreen
+          role={screen.role}
+          users={appUsers}
+          currentUserId={user?.uid ?? ""}
+          onDeleteUser={handleDeleteUser}
+          onUpdateUserRole={handleUpdateUserRole}
+          onTab={handleTab}
+          tab={tab}
+        />
       )}
 
       {screen.name === "perfil" && effectiveUser && (
@@ -320,8 +522,6 @@ export default function App() {
           onOpenReport={(id) => setScreen({ name: "detalle", reportId: id, returnTo: "admin" })}
           onNewReport={(cat) => setScreen({ name: "nueva", preCategory: cat, returnTo: "admin" })}
           onCancelReport={(id) => void handleCancelReportByTeacher(id)}
-          onAddSpace={(name) => void handleAddSpace(name)}
-          spaces={extraSpaces}
         />
       )}
     </Shell>

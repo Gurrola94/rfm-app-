@@ -274,7 +274,6 @@ export function DetalleScreen({
         <div className="bg-gray-50 rounded-2xl p-4 space-y-1.5 text-xs">
           <p><span className="font-bold text-gray-400">Folio:</span> <span className="text-[#0e1f4d] font-extrabold ml-1">{(report.folio ?? report.id).replace(/[^a-z0-9]/gi, "").toUpperCase()}</span></p>
           <p><span className="font-bold text-gray-400">Fecha y hora:</span> <span className="text-[#0e1f4d] font-bold ml-1">{formatDateTime(report.createdAt)}</span></p>
-          {report.horarioInicio && <p><span className="font-bold text-gray-400">Horario para reparar:</span> <span className="text-[#0e1f4d] font-bold ml-1">{report.horarioInicio} – {report.horarioFin}</span></p>}
           <p><span className="font-bold text-gray-400">Ubicación:</span> <span className="text-[#0e1f4d] font-bold ml-1">{report.salon}</span></p>
           <p><span className="font-bold text-gray-400">Solicitante:</span> <span className="text-[#0e1f4d] font-bold ml-1">{report.reportedBy}</span></p>
           <p><span className="font-bold text-gray-400">Categoría:</span> <span className="text-[#0e1f4d] font-bold ml-1">{CAT_ICON[report.category]} {report.category}</span></p>

@@ -10,10 +10,12 @@ import {
   onSnapshot,
   orderBy,
   query,
+  where,
 } from "firebase/firestore";
 
 import { auth, db, firebaseConfigured } from "@/lib/firebase";
 import type {
+  AppSpace,
   AppUser,
   MaterialRequest,
   Report,
@@ -24,10 +26,12 @@ import type {
 interface Setters {
   user: User | null;
   setUser: Dispatch<SetStateAction<User | null>>;
+  role: Role;
+  setRole: Dispatch<SetStateAction<Role>>;
   setAuthLoading: Dispatch<SetStateAction<boolean>>;
   setScreen: Dispatch<SetStateAction<Screen>>;
   setAppUsers: Dispatch<SetStateAction<AppUser[]>>;
-  setExtraSpaces: Dispatch<SetStateAction<string[]>>;
+  setSpaces: Dispatch<SetStateAction<AppSpace[]>>;
   setMaterialRequests: Dispatch<SetStateAction<MaterialRequest[]>>;
   setReports: Dispatch<SetStateAction<Report[]>>;
   onSessionRestored: (user: User, role: Role) => void;
@@ -40,10 +44,12 @@ interface Setters {
 export function useFirebaseSync({
   user,
   setUser,
+  role,
+  setRole,
   setAuthLoading,
   setScreen,
   setAppUsers,
-  setExtraSpaces,
+  setSpaces,
   setMaterialRequests,
   setReports,
   onSessionRestored,
@@ -72,10 +78,13 @@ export function useFirebaseSync({
         setUser(authenticatedUser);
 
         if (!authenticatedUser) {
+          setRole("docente");
           setAuthLoading(false);
           setScreen({ name: "login" });
           return;
         }
+
+        setRole("docente");
 
         try {
           const d = db;
@@ -102,15 +111,15 @@ export function useFirebaseSync({
         setAuthLoading(false);
       },
       (error) => {
-        console.error(
-          "Error de autenticación:",
-          error.code,
-          error.message
-        );
+        const errorCode =
+          "code" in error && typeof error.code === "string"
+            ? error.code
+            : "desconocido";
+        console.error("Error de autenticación:", errorCode, error.message);
         setAuthLoading(false);
       }
     );
-  }, [setUser, setAuthLoading, setScreen]);
+  }, [setUser, setRole, setAuthLoading, setScreen]);
 
   // Usuarios.
   useEffect(() => {
@@ -151,7 +160,7 @@ export function useFirebaseSync({
     const d = db;
 
     if (!firebaseConfigured || !d || !user) {
-      setExtraSpaces([]);
+      setSpaces([]);
       return;
     }
 
@@ -160,9 +169,12 @@ export function useFirebaseSync({
       (snap) => {
         console.log("Espacios recibidos de Firebase:", snap.size);
 
-        setExtraSpaces(
+        setSpaces(
           snap.docs.map(
-            (spaceDoc) => spaceDoc.data().name as string
+            (spaceDoc) => ({
+              id: spaceDoc.id,
+              ...spaceDoc.data(),
+            }) as AppSpace
           )
         );
       },
@@ -174,7 +186,7 @@ export function useFirebaseSync({
         );
       }
     );
-  }, [user, setExtraSpaces]);
+  }, [user, setSpaces]);
 
   // Solicitudes de material.
   useEffect(() => {
@@ -227,25 +239,32 @@ export function useFirebaseSync({
       return;
     }
 
-    const q = query(
-      collection(d, "reports"),
-      orderBy("createdAt", "desc")
-    );
+    const reportsCollection = collection(d, "reports");
+    const q =
+      role === "docente"
+        ? query(reportsCollection, where("reportedByUid", "==", user.uid))
+        : query(reportsCollection, orderBy("createdAt", "desc"));
 
     return onSnapshot(
       q,
       (snap) => {
         console.log("Reportes recibidos de Firebase:", snap.size);
 
-        setReports(
-          snap.docs.map(
-            (reportDoc) =>
-              ({
-                id: reportDoc.id,
-                ...reportDoc.data(),
-              }) as Report
-          )
+        const syncedReports = snap.docs.map(
+          (reportDoc) =>
+            ({
+              id: reportDoc.id,
+              ...reportDoc.data(),
+            }) as Report
         );
+        if (role === "docente") {
+          syncedReports.sort(
+            (a, b) =>
+              (b.createdAt?.toMillis() ?? 0) -
+              (a.createdAt?.toMillis() ?? 0)
+          );
+        }
+        setReports(syncedReports);
       },
       (error) => {
         console.error(
@@ -255,5 +274,5 @@ export function useFirebaseSync({
         );
       }
     );
-  }, [user, setReports]);
+  }, [user, role, setReports]);
 }

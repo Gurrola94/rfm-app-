@@ -32,6 +32,7 @@ export function HistorialScreen({
   materialRequests,
   role,
   onDetail,
+  onCancelReport,
   onTab,
   tab,
 }: {
@@ -39,6 +40,7 @@ export function HistorialScreen({
   materialRequests: MaterialRequest[];
   role: Role;
   onDetail: (id: string) => void;
+  onCancelReport?: (id: string) => Promise<void>;
   onTab: (t: Tab) => void;
   tab: Tab;
 }) {
@@ -50,6 +52,25 @@ export function HistorialScreen({
   const [selectedDay, setSelectedDay] = useState("");
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [monthYear, setMonthYear] = useState(String(currentDate.getFullYear()));
+  const [openReport, setOpenReport] = useState<string | null>(null);
+  const [confirmReport, setConfirmReport] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState("");
+
+  async function handleConfirmCancel() {
+    if (!confirmReport || !onCancelReport || cancelling) return;
+    setCancelling(true);
+    setCancelError("");
+    try {
+      await onCancelReport(confirmReport);
+      setConfirmReport(null);
+    } catch (error) {
+      console.error("Error al cancelar el reporte:", error);
+      setCancelError("No se pudo cancelar el reporte. Inténtalo nuevamente.");
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   const isCurrentMonth = (timestamp: Timestamp | null) => {
     if (!timestamp) return true;
@@ -286,13 +307,15 @@ export function HistorialScreen({
 
         <div className="space-y-2">
           {filteredReports.map((report) => (
-            <button
+            <div
               key={report.id}
-              type="button"
-              onClick={() => onDetail(report.id)}
-              className="w-full rounded-2xl border border-gray-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-[#17c3ce]/50"
+              className="flex items-start gap-2 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition hover:border-[#17c3ce]/50"
             >
-              <div className="flex items-start gap-3">
+              <button
+                type="button"
+                onClick={() => onDetail(report.id)}
+                className="flex min-w-0 flex-1 items-start gap-3 text-left"
+              >
                 <span
                   className={`mt-0.5 h-3 w-3 flex-none rounded-full ${PRIORITY_DOT[report.priority]}`}
                 />
@@ -316,8 +339,48 @@ export function HistorialScreen({
                     {formatDateTime(report.createdAt)}
                   </p>
                 </div>
-              </div>
-            </button>
+              </button>
+              {role === "docente" &&
+                report.status !== "Resuelto" &&
+                report.status !== "Cancelado" &&
+                onCancelReport && (
+                  <div className="relative flex-none">
+                    <button
+                      type="button"
+                      aria-label={`Opciones del reporte ${report.folio ?? report.id}`}
+                      aria-haspopup="menu"
+                      aria-expanded={openReport === report.id}
+                      onClick={() =>
+                        setOpenReport((openId) =>
+                          openId === report.id ? null : report.id,
+                        )
+                      }
+                      className="h-7 w-7 rounded-lg text-xl font-extrabold leading-none text-slate-400 transition hover:bg-slate-100 hover:text-[#0e1f4d]"
+                    >
+                      ⋮
+                    </button>
+                    {openReport === report.id && (
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-8 z-10 min-w-36 rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setOpenReport(null);
+                            setCancelError("");
+                            setConfirmReport(report.id);
+                          }}
+                          className="w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-xs font-extrabold text-red-600 transition hover:bg-red-50"
+                        >
+                          Cancelar reporte
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+            </div>
           ))}
           {filteredReports.length === 0 && (
             <div className="py-12 text-center text-sm text-gray-400">
@@ -327,6 +390,46 @@ export function HistorialScreen({
         </div>
       </div>
       <TabBar active={tab} onChange={onTab} admin={role === "admin"} />
+      {confirmReport && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0e1f4d]/40 p-5">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="cancel-history-report-title"
+            className="w-full rounded-2xl bg-white p-5 shadow-xl"
+          >
+            <h3 id="cancel-history-report-title" className="text-base font-extrabold text-[#0e1f4d]">
+              ¿Cancelar este reporte?
+            </h3>
+            <p className="mt-2 text-xs text-slate-500">
+              Esta acción retirará el reporte de tu lista.
+            </p>
+            {cancelError && (
+              <p role="alert" className="mt-3 text-xs font-semibold text-red-600">
+                {cancelError}
+              </p>
+            )}
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={cancelling}
+                onClick={() => setConfirmReport(null)}
+                className="rounded-xl border border-slate-200 py-2.5 text-xs font-extrabold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Volver
+              </button>
+              <button
+                type="button"
+                disabled={cancelling}
+                onClick={() => void handleConfirmCancel()}
+                className="rounded-xl bg-red-600 py-2.5 text-xs font-extrabold text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {cancelling ? "Cancelando..." : "Cancelar reporte"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

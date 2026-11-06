@@ -50,7 +50,6 @@ export function MantenimientoScreen({
               </div>
               <p className="text-[#0e1f4d] text-sm font-extrabold leading-snug mb-0.5">{CAT_ICON[r.category]} {r.elemento} · {r.salon}</p>
               <p className="text-gray-400 text-xs">{formatDateTime(r.createdAt)} | {r.reportedBy}</p>
-              {r.horarioInicio && <p className="text-gray-400 text-xs mt-0.5">Horario para reparar: {r.horarioInicio} – {r.horarioFin}</p>}
               <p className="mt-1.5">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[r.status]}`}>{r.status}</span>
                 {r.status === "Pendiente" && r.motivoPendiente && <span className="text-[11px] text-slate-500 ml-2">Pausado: {r.motivoPendiente}</span>}

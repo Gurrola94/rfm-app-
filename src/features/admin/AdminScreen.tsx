@@ -6,7 +6,7 @@ import type { Category, MaterialRequest, Report, Tab } from "@/types";
 import { timeAgo } from "@/utils/format";
 
 export function AdminScreen({
-  reports, requests, onTab, tab, onOpenFailures, onOpenMaterials, onOpenApoyos, onOpenReport, onViewAllIncoming, onNewReport, onCancelReport, onAddSpace, spaces,
+  reports, requests, onTab, tab, onOpenFailures, onOpenMaterials, onOpenApoyos, onOpenReport, onViewAllIncoming, onNewReport, onCancelReport,
 }: {
   reports: Report[];
   requests: MaterialRequest[];
@@ -19,10 +19,7 @@ export function AdminScreen({
   onViewAllIncoming: () => void;
   onNewReport: (cat?: Category) => void;
   onCancelReport: (id: string) => void;
-  onAddSpace: (name: string) => void;
-  spaces: string[];
 }) {
-  const [newSpace, setNewSpace] = useState("");
   const allIncomingReports = reports
     .filter((r) => r.role !== "admin" && r.status !== "Resuelto" && r.status !== "Cancelado")
     .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
@@ -122,14 +119,6 @@ export function AdminScreen({
             )}
           </section>
 
-          <section className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
-            <h3 className="text-[#0e1f4d] text-sm font-extrabold mb-3">Agregar espacio</h3>
-            <div className="flex gap-2">
-              <input value={newSpace} onChange={(e) => setNewSpace(e.target.value)} placeholder="Ej. Biblioteca" className="flex-1 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-[#17c3ce]" />
-              <button type="button" onClick={() => { onAddSpace(newSpace); setNewSpace(""); }} className="rounded-xl bg-[#17c3ce] px-4 py-2.5 text-xs font-extrabold text-white hover:bg-[#12a8b3] transition">Agregar</button>
-            </div>
-            {spaces.length > 0 && <p className="text-slate-400 text-[10px] font-bold mt-3">Agregados: {spaces.join(", ")}</p>}
-          </section>
         </div>
       </div>
       <TabBar active={tab} onChange={onTab} admin />

@@ -10,12 +10,29 @@ export function HomeScreen({
 }: {
   user: User; role: Role; reports: Report[];
   onNewReport: (cat?: Category) => void;
-  onCancelReport?: (id: string) => void;
+  onCancelReport?: (id: string) => Promise<void>;
   onTab: (t: Tab) => void; tab: Tab;
 }) {
   const myReports = reports.filter((r) => r.reportedByUid === user.uid && r.status !== "Cancelado").slice(0, 3);
   const [openReport, setOpenReport] = useState<string | null>(null);
   const [confirmReport, setConfirmReport] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState("");
+
+  async function handleConfirmCancel() {
+    if (!confirmReport || !onCancelReport || cancelling) return;
+    setCancelling(true);
+    setCancelError("");
+    try {
+      await onCancelReport(confirmReport);
+      setConfirmReport(null);
+    } catch (error) {
+      console.error("Error al cancelar el reporte:", error);
+      setCancelError("No se pudo cancelar el reporte. Inténtalo nuevamente.");
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   return (
     <>
@@ -65,21 +82,24 @@ export function HomeScreen({
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-none ${STATUS_BADGE[r.status]}`}>
                         {r.status}
                       </span>
-                      {r.status !== "Resuelto" && r.status !== "Cancelado" && onCancelReport && (
+                      {role === "docente" && r.status !== "Resuelto" && r.status !== "Cancelado" && onCancelReport && (
                         <div className="relative">
                           <button
                             type="button"
                             aria-label={`Opciones de ${r.description}`}
+                            aria-haspopup="menu"
+                            aria-expanded={openReport === r.id}
                             onClick={() => setOpenReport(openReport === r.id ? null : r.id)}
-                            className="w-7 h-7 rounded-lg text-slate-400 text-sm font-extrabold leading-none hover:bg-slate-200 transition"
+                            className="w-7 h-7 rounded-lg text-slate-400 text-xl font-extrabold leading-none hover:bg-slate-200 transition"
                           >
-                            ...
+                            ⋮
                           </button>
                           {openReport === r.id && (
-                            <div className="absolute right-0 top-8 z-10 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                            <div role="menu" className="absolute right-0 top-8 z-10 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
                               <button
                                 type="button"
-                                onClick={() => { setOpenReport(null); setConfirmReport(r.id); }}
+                                role="menuitem"
+                                onClick={() => { setOpenReport(null); setCancelError(""); setConfirmReport(r.id); }}
                                 className="whitespace-nowrap rounded-lg px-3 py-2 text-xs font-extrabold text-red-600 hover:bg-red-50"
                               >
                                 Cancelar reporte
@@ -99,12 +119,13 @@ export function HomeScreen({
       <TabBar active={tab} onChange={onTab} />
       {confirmReport && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0e1f4d]/30 p-5">
-          <div className="w-full rounded-2xl bg-white p-5 shadow-xl">
-            <h3 className="text-[#0e1f4d] text-base font-extrabold">¿Cancelar este reporte?</h3>
+          <div role="alertdialog" aria-modal="true" aria-labelledby="cancel-home-report-title" className="w-full rounded-2xl bg-white p-5 shadow-xl">
+            <h3 id="cancel-home-report-title" className="text-[#0e1f4d] text-base font-extrabold">¿Cancelar este reporte?</h3>
             <p className="text-slate-500 text-xs mt-2">Esta acción retirará el reporte de tu lista.</p>
+            {cancelError && <p role="alert" className="mt-3 text-xs font-semibold text-red-600">{cancelError}</p>}
             <div className="grid grid-cols-2 gap-2 mt-5">
-              <button type="button" onClick={() => setConfirmReport(null)} className="rounded-xl border border-slate-200 py-2.5 text-xs font-extrabold text-slate-600 hover:bg-slate-50">Volver</button>
-              <button type="button" onClick={() => { onCancelReport?.(confirmReport); setConfirmReport(null); }} className="rounded-xl bg-red-600 py-2.5 text-xs font-extrabold text-white hover:bg-red-700">Cancelar reporte</button>
+              <button type="button" disabled={cancelling} onClick={() => setConfirmReport(null)} className="rounded-xl border border-slate-200 py-2.5 text-xs font-extrabold text-slate-600 hover:bg-slate-50 disabled:opacity-60">Volver</button>
+              <button type="button" disabled={cancelling} onClick={() => void handleConfirmCancel()} className="rounded-xl bg-red-600 py-2.5 text-xs font-extrabold text-white hover:bg-red-700 disabled:opacity-60">{cancelling ? "Cancelando..." : "Cancelar reporte"}</button>
             </div>
           </div>
         </div>

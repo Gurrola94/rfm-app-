@@ -35,8 +35,6 @@ export interface Report {
   motivoPendiente?: string;
   notasAvance?: string;
   evidenciaNombre?: string;
-  horarioInicio?: string;
-  horarioFin?: string;
   fotoResuelto?: string;
   avances?: Avance[];
 }
@@ -59,4 +57,13 @@ export interface AppUser {
   role: "tecnico" | "docente" | "admin";
   temporaryPassword?: string;
   createdAt?: Timestamp | null;
+}
+
+export interface AppSpace {
+  id: string;
+  name: string;
+  createdAt?: Timestamp | null;
+  isDefault?: boolean;
+  baseName?: string;
+  deleted?: boolean;
 }

@@ -13,7 +13,9 @@ export function TabBar({ active, onChange, admin = false }: { active: Tab; onCha
           {t === "usuarios" && <UsersIcon />}
           {t === "reportes" && <ListIcon />}
           {t === "perfil" && <PersonIcon />}
-          <span className="text-[10px] font-bold capitalize">{t}</span>
+          <span className="text-[10px] font-bold capitalize">
+            {admin && t === "usuarios" ? "Gestión" : t}
+          </span>
         </button>
       ))}
     </div>

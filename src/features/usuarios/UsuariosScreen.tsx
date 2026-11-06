@@ -10,6 +10,7 @@ export function UsuariosScreen({
   onUpdateRole,
   onDeleteUser,
   onOpenList,
+  onBack,
   onTab,
   tab,
 }: {
@@ -18,6 +19,7 @@ export function UsuariosScreen({
   onUpdateRole: (id: string, role: Role) => Promise<void>;
   onDeleteUser: (id: string) => Promise<void>;
   onOpenList: (role: "all" | Role) => void;
+  onBack: () => void;
   onTab: (t: Tab) => void;
   tab: Tab;
 }) {
@@ -129,7 +131,7 @@ export function UsuariosScreen({
 
   return (
     <>
-      <NavHeader title="Administración" />
+      <NavHeader title="Usuarios" onBack={onBack} />
 
       <div className="flex-1 overflow-y-auto bg-[#f4f6fb] px-4 py-5">
         <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#17c3ce]">

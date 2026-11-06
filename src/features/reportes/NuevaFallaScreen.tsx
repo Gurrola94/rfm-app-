@@ -42,8 +42,8 @@ export function NuevaFallaScreen({
   const [category, setCategory] = useState<Category>(
     preCategory ?? "Minisplit/Clima"
   );
-  const [horarioInicio, setHorarioInicio] = useState("");
-  const [horarioFin, setHorarioFin] = useState("");
+  const [selectedGroup, setSelectedGroup] = useState("Ninguno");
+  const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -63,13 +63,7 @@ export function NuevaFallaScreen({
     if (sending) return;
 
     // Comprueba los campos obligatorios.
-    if (
-      !salon.trim() ||
-      !elemento.trim() ||
-      !description.trim() ||
-      !horarioInicio ||
-      !horarioFin
-    ) {
+    if (!salon.trim() || !elemento.trim() || !description.trim()) {
       alert("Completa todos los campos obligatorios.");
       return;
     }
@@ -90,8 +84,6 @@ export function NuevaFallaScreen({
           salon,
           elemento,
           description,
-          horarioInicio,
-          horarioFin,
           status: "Pendiente",
           reportedBy,
           reportedByUid: user.uid || "demo",
@@ -130,8 +122,6 @@ export function NuevaFallaScreen({
         salon: salon.trim(),
         elemento: elemento.trim(),
         description: description.trim(),
-        horarioInicio,
-        horarioFin,
         status: "Pendiente",
         reportedBy,
         reportedByUid: user.uid,
@@ -274,32 +264,6 @@ export function NuevaFallaScreen({
 
             <div>
               <label className="text-[#0e1f4d] text-xs font-bold mb-1 block">
-                Horario disponible para reparar:
-              </label>
-
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="time"
-                  required
-                  form="nueva-falla-form"
-                  value={horarioInicio}
-                  onChange={(e) => setHorarioInicio(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-slate-50 focus:outline-none focus:border-[#17c3ce] transition"
-                />
-
-                <input
-                  type="time"
-                  required
-                  form="nueva-falla-form"
-                  value={horarioFin}
-                  onChange={(e) => setHorarioFin(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-slate-50 focus:outline-none focus:border-[#17c3ce] transition"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[#0e1f4d] text-xs font-bold mb-1 block">
                 Prioridad percibida:
               </label>
 
@@ -326,16 +290,58 @@ export function NuevaFallaScreen({
             </div>
 
             <div>
-              <label className="text-[#0e1f4d] text-xs font-bold mb-1 block">
-                Fotografía (Opcional):
-              </label>
+              <p className="text-[#0e1f4d] text-xs font-bold mb-2">Opcional:</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:bg-slate-200"
+                >
+                  + Tomar foto
+                </button>
 
-              <button
-                type="button"
-                className="bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-slate-200 transition"
-              >
-                + Tomar foto
-              </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={groupMenuOpen}
+                    onClick={() => setGroupMenuOpen((open) => !open)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:bg-slate-200"
+                  >
+                    Seleccionar grupo
+                  </button>
+                  {groupMenuOpen && (
+                    <div
+                      role="menu"
+                      aria-label="Seleccionar grupo"
+                      className="absolute left-0 right-0 top-full z-10 mt-1 rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
+                    >
+                      {["Ninguno", "2-A", "1-B"].map((group) => (
+                        <button
+                          key={group}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setSelectedGroup(group);
+                            setGroupMenuOpen(false);
+                          }}
+                          className={`w-full rounded-lg px-3 py-2 text-left text-xs font-semibold transition hover:bg-slate-100 ${
+                            selectedGroup === group
+                              ? "text-[#0e1f4d]"
+                              : "text-slate-500"
+                          }`}
+                        >
+                          {group}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {selectedGroup !== "Ninguno" && (
+                    <p className="mt-1 text-center text-[10px] text-slate-500">
+                      Grupo seleccionado: {selectedGroup}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
