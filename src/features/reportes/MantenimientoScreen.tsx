@@ -58,9 +58,6 @@ export function MantenimientoScreen({
                 <button onClick={() => onDetail(r.id)} className="text-xs font-bold text-[#0e1f4d] border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition">
                   Ver detalles
                 </button>
-                {!readOnly && <button className="text-xs font-bold text-[#17c3ce] border border-[#17c3ce]/30 px-3 py-1.5 rounded-full hover:bg-[#17c3ce]/10 transition">
-                  Notificar arreglo 🔔
-                </button>}
               </div>}
             </div>
           ))}

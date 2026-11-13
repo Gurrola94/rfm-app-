@@ -188,7 +188,7 @@ export function LoginScreen({
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!normalizedEmail) {
-      setError("Escribe tu correo para recuperar tu contraseña.");
+      setError("Solicita apoyo al administrador.");
       return;
     }
 
@@ -317,7 +317,7 @@ export function LoginScreen({
         >
           {isRegister
             ? "Ya tengo cuenta"
-            : "¿Eres docente? Regístrate"}
+            : "Regístrate"}
         </button>
       </div>
     </div>
