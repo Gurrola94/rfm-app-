@@ -175,7 +175,7 @@ export function EspaciosScreen({
 
   return (
     <>
-      <NavHeader title="Espacios" onBack={onBack} />
+      <NavHeader title="Espacios"/>
       <div className="flex min-h-0 flex-1 flex-col bg-[#f4f6fb]">
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#17c3ce]">

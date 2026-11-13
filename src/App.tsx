@@ -17,6 +17,7 @@ import { NuevaFallaScreen } from "@/features/reportes/NuevaFallaScreen";
 import { AdminMaterialHistoryScreen } from "@/features/material/AdminMaterialHistoryScreen";
 import { AdminMaterialScreen } from "@/features/material/AdminMaterialScreen";
 import { EspaciosScreen, GestionScreen } from "@/features/admin/GestionScreen";
+import { AdminMyReportsScreen } from "@/features/admin/AdminMyReportsScreen";
 import { UsuariosListaScreen } from "@/features/usuarios/UsuariosListaScreen";
 import { UsuariosScreen } from "@/features/usuarios/UsuariosScreen";
 import { AdminScreen } from "@/features/admin/AdminScreen";
@@ -270,12 +271,13 @@ export default function App() {
     setAppUsers((current) => current.filter((appUser) => appUser.id !== id));
   }
 
-  async function handleCancelReportByTeacher(id: string) {
+  async function handleCancelOwnReport(id: string, ownerRole: "docente" | "admin") {
     const report = reports.find((current) => current.id === id);
     if (
-      role !== "docente" ||
+      role !== ownerRole ||
       !effectiveUser ||
       !report ||
+      report.role !== ownerRole ||
       report.reportedByUid !== effectiveUser.uid ||
       report.status === "Resuelto" ||
       report.status === "Cancelado"
@@ -294,6 +296,14 @@ export default function App() {
           : currentReport,
       ),
     );
+  }
+
+  async function handleCancelReportByTeacher(id: string) {
+    await handleCancelOwnReport(id, "docente");
+  }
+
+  async function handleCancelReportByAdmin(id: string) {
+    await handleCancelOwnReport(id, "admin");
   }
 
   async function handleLogout() {
@@ -323,12 +333,13 @@ export default function App() {
         setScreen(screen.returnTo === "admin" ? { name: "admin" } : { name: "home" });
         return true;
       case "detalle":
-        setScreen(screen.returnTo === "historial" ? { name: "historial" } : screen.returnTo === "admin-fallas" ? { name: "admin-fallas" } : screen.returnTo === "admin" ? { name: "admin" } : { name: "mantenimiento" });
+        setScreen(screen.returnTo === "historial" ? { name: "historial" } : screen.returnTo === "admin-fallas" ? { name: "admin-fallas" } : screen.returnTo === "admin" ? { name: "admin" } : screen.returnTo === "admin-mis-reportes" ? { name: "admin-mis-reportes" } : { name: "mantenimiento" });
         return true;
       case "admin-fallas":
       case "admin-materiales":
       case "admin-apoyos":
       case "admin-materiales-historial":
+      case "admin-mis-reportes":
         setScreen({ name: "admin" });
         return true;
       case "usuarios-list":
@@ -439,9 +450,11 @@ export default function App() {
         <DetalleScreen
           report={selectedReport}
           viewerRole={role}
+          onTab={handleTab}
+          tab={tab}
           materialRequests={materialRequests}
           isHistory={screen.returnTo === "historial"}
-          onBack={() => setScreen(screen.returnTo === "historial" ? { name: "historial" } : screen.returnTo === "admin-fallas" ? { name: "admin-fallas" } : screen.returnTo === "admin" ? { name: "admin" } : { name: "mantenimiento" })}
+          onBack={() => setScreen(screen.returnTo === "historial" ? { name: "historial" } : screen.returnTo === "admin-fallas" ? { name: "admin-fallas" } : screen.returnTo === "admin" ? { name: "admin" } : screen.returnTo === "admin-mis-reportes" ? { name: "admin-mis-reportes" } : { name: "mantenimiento" })}
           demoMode={!firebaseConfigured}
           onDemoUpdate={(id, data) =>
             setReports((prev) => prev.map((r) => r.id === id ? { ...r, ...data } : r))
@@ -454,6 +467,17 @@ export default function App() {
 
       {screen.name === "historial" && (
         <HistorialScreen reports={roleVisibleReports} materialRequests={materialRequests} role={role} onDetail={(id) => setScreen({ name: "detalle", reportId: id, returnTo: "historial" })} onCancelReport={role === "docente" ? handleCancelReportByTeacher : undefined} onTab={handleTab} tab={tab} />
+      )}
+
+      {screen.name === "admin-mis-reportes" && (
+        <AdminMyReportsScreen
+          reports={reports}
+          currentUserId={effectiveUser?.uid ?? ""}
+          onDetail={(id) => setScreen({ name: "detalle", reportId: id, returnTo: "admin-mis-reportes" })}
+          onCancelReport={handleCancelReportByAdmin}
+          onTab={handleTab}
+          tab={tab}
+        />
       )}
 
       {screen.name === "gestion" && (
@@ -513,15 +537,15 @@ export default function App() {
         <AdminScreen
           reports={reports}
           requests={materialRequests}
+          currentUserId={effectiveUser?.uid ?? ""}
           onTab={handleTab}
           tab={tab}
           onOpenFailures={() => setScreen({ name: "admin-fallas" })}
-          onViewAllIncoming={() => handleTab("reportes")}
           onOpenMaterials={() => setScreen({ name: "admin-materiales" })}
           onOpenApoyos={() => setScreen({ name: "admin-apoyos" })}
-          onOpenReport={(id) => setScreen({ name: "detalle", reportId: id, returnTo: "admin" })}
+          onViewMyReports={() => setScreen({ name: "admin-mis-reportes" })}
           onNewReport={(cat) => setScreen({ name: "nueva", preCategory: cat, returnTo: "admin" })}
-          onCancelReport={(id) => void handleCancelReportByTeacher(id)}
+          onCancelReport={(id) => void handleCancelReportByAdmin(id)}
         />
       )}
     </Shell>

@@ -131,7 +131,7 @@ export function UsuariosScreen({
 
   return (
     <>
-      <NavHeader title="Usuarios" onBack={onBack} />
+      <NavHeader title="Usuarios"/>
 
       <div className="flex-1 overflow-y-auto bg-[#f4f6fb] px-4 py-5">
         <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#17c3ce]">

@@ -3,15 +3,17 @@ import { collection, addDoc, doc, updateDoc, serverTimestamp, Timestamp } from "
 import { db } from "@/lib/firebase";
 import { AvancesList } from "@/features/reportes/components/AvancesList";
 import { NavHeader } from "@/components/layout/NavHeader";
+import { TabBar } from "@/components/layout/TabBar";
 import { CAT_ICON, PRIORITY_BADGE, PRIORITY_LABELS, STATUS_BADGE } from "@/constants";
-import type { Avance, MaterialRequest, Report, Role } from "@/types";
+import type { Avance, MaterialRequest, Report, Role, Tab } from "@/types";
 import { formatDateTime } from "@/utils/format";
 import { takePhoto } from "@/utils/image";
 
 export function DetalleScreen({
-  report, onBack, demoMode, onDemoUpdate, onMaterialRequest, onRequestStatus, requesterName, viewerRole, materialRequests, isHistory = false,
+  report, onBack, onTab, tab, demoMode, onDemoUpdate, onMaterialRequest, onRequestStatus, requesterName, viewerRole, materialRequests, isHistory = false,
 }: {
   report: Report; onBack: () => void;
+  onTab: (tab: Tab) => void; tab: Tab;
   viewerRole: Role;
   materialRequests: MaterialRequest[];
   isHistory?: boolean;
@@ -205,12 +207,6 @@ export function DetalleScreen({
     <>
       <NavHeader title={viewerRole === "admin" ? "Administracion" : viewerRole === "tecnico" ? "Tecnico" : "Docente"} />
       <div className="flex-none bg-white px-5 py-2.5 border-b border-gray-100">
-        <button
-          onClick={onBack}
-          className="border border-slate-200 bg-white text-[#0e1f4d] text-xs font-extrabold px-3 py-2 rounded-xl shadow-sm hover:bg-slate-50 transition"
-        >
-          <span className="text-[#17c3ce] mr-1">‹</span> Volver
-        </button>
       </div>
       <div className="flex-1 overflow-y-auto bg-white px-5 py-4 space-y-4 scrollbar-hide">
         <div className="relative flex items-center justify-between">
@@ -487,6 +483,7 @@ export function DetalleScreen({
           {saving ? "Guardando..." : "Marcar como resuelto"}
         </button>
       </div>}
+      <TabBar active={tab} onChange={onTab} admin={viewerRole === "admin"} />
     </>
   );
 }

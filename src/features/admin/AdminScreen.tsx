@@ -3,33 +3,31 @@ import { NavHeader } from "@/components/layout/NavHeader";
 import { TabBar } from "@/components/layout/TabBar";
 import { PRIORITY_DOT, STATUS_BADGE } from "@/constants";
 import type { Category, MaterialRequest, Report, Tab } from "@/types";
-import { timeAgo } from "@/utils/format";
 
 export function AdminScreen({
-  reports, requests, onTab, tab, onOpenFailures, onOpenMaterials, onOpenApoyos, onOpenReport, onViewAllIncoming, onNewReport, onCancelReport,
+  reports, requests, currentUserId, onTab, tab, onOpenFailures, onOpenMaterials, onOpenApoyos, onViewMyReports, onNewReport, onCancelReport,
 }: {
   reports: Report[];
   requests: MaterialRequest[];
+  currentUserId: string;
   onTab: (t: Tab) => void;
   tab: Tab;
   onOpenFailures: () => void;
   onOpenMaterials: () => void;
   onOpenApoyos: () => void;
-  onOpenReport: (id: string) => void;
-  onViewAllIncoming: () => void;
+  onViewMyReports: () => void;
   onNewReport: (cat?: Category) => void;
   onCancelReport: (id: string) => void;
 }) {
-  const allIncomingReports = reports
-    .filter((r) => r.role !== "admin" && r.status !== "Resuelto" && r.status !== "Cancelado")
-    .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
-  const incomingReports = allIncomingReports.slice(0, 3);
   const activeFailures = reports.filter((report) => report.status !== "Resuelto" && report.status !== "Cancelado").length;
   const pendingRequests = requests.filter((request) => request.status === "Pendiente de aprobación" && request.tipo !== "apoyo_externo");
   const pendingApoyos = requests.filter((request) => request.status === "Pendiente de aprobación" && request.tipo === "apoyo_externo");
   const [openReport, setOpenReport] = useState<string | null>(null);
   const [confirmReport, setConfirmReport] = useState<string | null>(null);
-  const adminReports = reports.filter((report) => report.role === "admin" && report.status !== "Cancelado").slice(0, 3);
+  const adminReports = reports
+    .filter((report) => report.role === "admin" && report.reportedByUid === currentUserId && report.status !== "Cancelado")
+    .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+  const recentAdminReports = adminReports.slice(0, 2);
 
   return (
     <>
@@ -57,35 +55,6 @@ export function AdminScreen({
 
         <div className="space-y-4">
           <section className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
-            <h3 className="text-[#0e1f4d] text-sm font-extrabold mb-3">Reportes recibidos</h3>
-            {incomingReports.length === 0 ? (
-              <p className="text-gray-400 text-xs text-center py-4">Sin reportes nuevos</p>
-            ) : (
-              <div className="space-y-2">
-                {incomingReports.map((r) => (
-                  <button key={r.id} type="button" onClick={() => onOpenReport(r.id)} className="w-full text-left bg-[#f8fafc] rounded-xl px-4 py-3 flex items-center gap-3 shadow-sm border border-gray-100 hover:border-[#17c3ce]/50 transition">
-                    <span className={`w-2.5 h-2.5 rounded-full flex-none ${PRIORITY_DOT[r.priority]}`} />
-                    <span className="flex-1 min-w-0">
-                      <span className="block truncate text-xs text-[#0e1f4d] font-semibold">{r.elemento} · {r.salon}</span>
-                      <span className="block text-[10px] text-gray-400">{r.reportedBy} · {timeAgo(r.createdAt)}</span>
-                    </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-none ${STATUS_BADGE[r.status]}`}>{r.status}</span>
-                  </button>
-                ))}
-                {allIncomingReports.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={onViewAllIncoming}
-                    className="w-full rounded-full border border-[#17c3ce] bg-[#17c3ce]/10 py-2.5 text-xs font-extrabold text-[#0e1f4d] transition hover:bg-[#17c3ce]/20"
-                  >
-                    Ver más
-                  </button>
-                )}
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
             <h2 className="text-[#0e1f4d] text-lg font-extrabold leading-snug mb-3">¿Qué problema desea reportar hoy?</h2>
             <button onClick={() => onNewReport()} className="w-full bg-[#17c3ce] text-white font-extrabold py-3 rounded-full text-sm hover:bg-[#12a8b3] transition-all">Reportar nueva falla</button>
           </section>
@@ -96,7 +65,7 @@ export function AdminScreen({
               <p className="text-gray-400 text-xs text-center py-4">Sin reportes aún</p>
             ) : (
               <div className="space-y-2">
-                {adminReports.map((report) => (
+                {recentAdminReports.map((report) => (
                   <div key={report.id}>
                     <div className="bg-[#f8fafc] rounded-xl px-4 py-3 flex items-center gap-3 shadow-sm border border-gray-100">
                       <span className={`w-2.5 h-2.5 rounded-full flex-none ${PRIORITY_DOT[report.priority]}`} />
@@ -115,6 +84,15 @@ export function AdminScreen({
                     </div>
                   </div>
                 ))}
+                {adminReports.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={onViewMyReports}
+                    className="w-full rounded-full border border-[#17c3ce] bg-[#17c3ce]/10 py-2.5 text-xs font-extrabold text-[#0e1f4d] transition hover:bg-[#17c3ce]/20"
+                  >
+                    Ver más
+                  </button>
+                )}
               </div>
             )}
           </section>

@@ -7,7 +7,7 @@ import { formatDateTime } from "@/utils/format";
 const PRIORITY_ORDER: Record<string, number> = { Urgente: 0, Media: 1, Baja: 2 };
 
 export function MantenimientoScreen({
-  reports, onDetail, onTab, tab, readOnly = false, title = "Mantenimiento", admin = false,
+  reports, onDetail, onTab, tab, title = "Mantenimiento", admin = false,
 }: {
   reports: Report[]; onDetail: (id: string) => void; onTab: (t: Tab) => void; tab: Tab;
   readOnly?: boolean; title?: string; admin?: boolean;
@@ -38,9 +38,11 @@ export function MantenimientoScreen({
         </h2>
         <div className="space-y-3">
           {pending.map((r) => (
-            <div
+            <button
               key={r.id}
-              className={`bg-white rounded-2xl p-4 shadow-sm border-l-4 ${
+              type="button"
+              onClick={() => onDetail(r.id)}
+              className={`w-full text-left bg-white rounded-2xl p-4 shadow-sm border-l-4 ${
                 r.priority === "Urgente" ? "border-red-500" : r.priority === "Media" ? "border-amber-400" : "border-green-500"
               }`}
             >
@@ -54,12 +56,7 @@ export function MantenimientoScreen({
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[r.status]}`}>{r.status}</span>
                 {r.status === "Pendiente" && r.motivoPendiente && <span className="text-[11px] text-slate-500 ml-2">Pausado: {r.motivoPendiente}</span>}
               </p>
-              {(!readOnly || admin) && <div className="flex gap-2 mt-3 flex-wrap">
-                <button onClick={() => onDetail(r.id)} className="text-xs font-bold text-[#0e1f4d] border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition">
-                  Ver detalles
-                </button>
-              </div>}
-            </div>
+            </button>
           ))}
           {pending.length === 0 && (
             <div className="text-center py-14 text-gray-400 text-sm">Sin reportes pendientes </div>

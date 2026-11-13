@@ -121,7 +121,7 @@ export function NuevaFallaScreen({
 
     if (sending) return;
 
-    if (!salon.trim() || !elemento.trim() || !description.trim()) {
+    if (!salon.trim() || !elemento.trim()) {
       alert("Completa todos los campos obligatorios.");
       return;
     }

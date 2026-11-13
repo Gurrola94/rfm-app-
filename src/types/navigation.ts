@@ -5,10 +5,11 @@ export type Screen =
   | { name: "home" }
   | { name: "nueva"; preCategory?: Category; returnTo?: "home" | "admin" }
   | { name: "mantenimiento" }
-  | { name: "detalle"; reportId: string; returnTo: "mantenimiento" | "admin-fallas" | "historial" | "admin" }
+  | { name: "detalle"; reportId: string; returnTo: "mantenimiento" | "admin-fallas" | "historial" | "admin" | "admin-mis-reportes" }
   | { name: "historial" }
   | { name: "perfil" }
   | { name: "admin" }
+  | { name: "admin-mis-reportes" }
   | { name: "admin-fallas" }
   | { name: "admin-materiales" }
   | { name: "admin-apoyos" }
