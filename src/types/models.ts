@@ -1,0 +1,83 @@
+import { Timestamp } from "firebase/firestore";
+
+export type Role = "docente" | "tecnico" | "admin";
+export type Priority = "Urgente" | "Media" | "Baja";
+export type Status = "Pendiente" | "En proceso" | "Resuelto" | "Cancelado";
+export type Category = "Minisplit/Clima" | "Chapas/Puertas" | "Eléctrico" | "Mobiliario" | "Plomería" | "Tecnología";
+export type Tab = "home" | "usuarios" | "avisos" | "reportes" | "perfil";
+
+export interface Avance {
+  fecha: Timestamp;
+  estado: "En proceso" | "Pendiente";
+  notas: string;
+  por?: string;
+  motivo?: string;
+  evidenciaNombre?: string;
+  foto?: string;
+}
+
+export interface Report {
+  id: string;
+  folio?: string;
+  category: Category;
+  priority: Priority;
+  status: Status;
+  salon: string;
+  elemento: string;
+  description: string;
+  reportedBy: string;
+  reportedByUid: string;
+  role: Role;
+  createdAt: Timestamp | null;
+  acciones?: string;
+  materiales?: string;
+  photoUrl?: string;
+  fotos?: string[];
+  motivoPendiente?: string;
+  notasAvance?: string;
+  evidenciaNombre?: string;
+  fotoResuelto?: string;
+  avances?: Avance[];
+}
+
+export interface MaterialRequest {
+  id: string;
+  reportId?: string;
+  workNoticeId?: string;
+  material: string;
+  observation: string;
+  requestedBy: string;
+  status: "Pendiente de aprobación" | "Aprobada" | "Rechazada" | "Cancelada";
+  createdAt: Timestamp | null;
+  estimatedCost?: number;
+  tipo?: "material" | "apoyo_externo";
+}
+
+export interface WorkNotice {
+  id: string;
+  place: string;
+  time: string;
+  activity: string;
+  materials?: string;
+  status?: "Cancelado";
+  createdBy: string;
+  createdByUid: string;
+  createdAt: Timestamp | null;
+}
+
+export interface AppUser {
+  id: string;
+  email: string;
+  role: "tecnico" | "docente" | "admin";
+  temporaryPassword?: string;
+  createdAt?: Timestamp | null;
+}
+
+export interface AppSpace {
+  id: string;
+  name: string;
+  createdAt?: Timestamp | null;
+  isDefault?: boolean;
+  baseName?: string;
+  deleted?: boolean;
+}

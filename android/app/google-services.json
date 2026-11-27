@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "264165166772",
+    "firebase_url": "https://rfm-bd-default-rtdb.firebaseio.com",
+    "project_id": "rfm-bd",
+    "storage_bucket": "rfm-bd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:264165166772:android:5344cf65bae6f8c621d1e1",
+        "android_client_info": {
+          "package_name": "mx.buhsab.rfm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBNdZHp-xl3DFwwgfZTZ6VhPq6dV23EBRc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

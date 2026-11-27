@@ -1,0 +1,69 @@
+import { NavHeader } from "@/components/layout/NavHeader";
+import { TabBar } from "@/components/layout/TabBar";
+import { CAT_ICON, PRIORITY_BADGE, PRIORITY_DOT, PRIORITY_LABELS, STATUS_BADGE } from "@/constants";
+import type { Report, Tab } from "@/types";
+import { formatDateTime } from "@/utils/format";
+
+const PRIORITY_ORDER: Record<string, number> = { Urgente: 0, Media: 1, Baja: 2 };
+
+export function MantenimientoScreen({
+  reports, onDetail, onTab, tab, admin = false, technician = false,
+}: {
+  reports: Report[]; onDetail: (id: string) => void; onTab: (t: Tab) => void; tab: Tab;
+  readOnly?: boolean; admin?: boolean; technician?: boolean;
+}) {
+
+  const pending = reports
+    .filter((r) => r.status !== "Resuelto" && r.status !== "Cancelado")
+    .sort((a, b) => {
+      const porPrioridad = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+      if (porPrioridad !== 0) return porPrioridad;
+      return (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0);
+    });
+
+  console.log("Estados de reportes:", reports.map((r) => ({
+    id: r.id,
+    folio: r.folio,
+    status: r.status,
+  })));
+
+  console.log("Reportes pendientes:", pending.map((r) => r.folio));
+
+  return (
+    <>
+      <NavHeader />
+      <div className="flex-1 overflow-y-auto bg-[#f4f6fb] px-4 pt-5 pb-4 scrollbar-hide">
+        <h2 className="text-[#0e1f4d] text-base font-extrabold mb-3">
+          Reportes pendientes ({pending.length})
+        </h2>
+        <div className="space-y-3">
+          {pending.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => onDetail(r.id)}
+              className={`w-full text-left bg-white rounded-2xl p-4 shadow-sm border-l-4 ${
+                r.priority === "Urgente" ? "border-red-500" : r.priority === "Media" ? "border-amber-400" : "border-green-500"
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`w-2.5 h-2.5 rounded-full flex-none ${PRIORITY_DOT[r.priority]}`} />
+                <span className={`text-xs font-extrabold ${PRIORITY_BADGE[r.priority]}`}>{PRIORITY_LABELS[r.priority]}</span>
+              </div>
+              <p className="text-[#0e1f4d] text-sm font-extrabold leading-snug mb-0.5">{CAT_ICON[r.category]} {r.elemento} · {r.salon}</p>
+              <p className="text-gray-400 text-xs">{formatDateTime(r.createdAt)} | {r.reportedBy}</p>
+              <p className="mt-1.5">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[r.status]}`}>{r.status}</span>
+                {r.status === "Pendiente" && r.motivoPendiente && <span className="text-[11px] text-slate-500 ml-2">Pausado: {r.motivoPendiente}</span>}
+              </p>
+            </button>
+          ))}
+          {pending.length === 0 && (
+            <div className="text-center py-14 text-gray-400 text-sm">Sin reportes pendientes </div>
+          )}
+        </div>
+      </div>
+      <TabBar active={tab} onChange={onTab} admin={admin} technician={technician} />
+    </>
+  );
+}
